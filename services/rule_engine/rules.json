@@ -1,0 +1,9 @@
+[
+  {
+    "id": "min_fillet_cnc",
+    "parameter": "fillet_radius_mm",
+    "min_value": 2.0,
+    "severity": "high",
+    "message": "Minimum fillet radius for CNC is 2mm"
+  }
+]

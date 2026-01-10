@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "required": ["design_id", "version", "part_class"],
+  "properties": {
+    "design_id": { "type": "string" },
+    "version": { "type": "string" },
+    "part_class": { "type": "string" },
+
+    "functional_requirements": { "type": "object" },
+    "constraints": { "type": "object" },
+    "interfaces": { "type": "object" },
+    "design_parameters": { "type": "object" },
+    "acceptance_criteria": { "type": "object" }
+  }
+}

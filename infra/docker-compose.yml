@@ -1,0 +1,16 @@
+services:
+  intent-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: uvicorn services.intent_service.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+
+  ai-reasoning:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: uvicorn services.ai_reasoning.main:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
