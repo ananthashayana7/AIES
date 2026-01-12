@@ -1,6 +1,10 @@
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 
+class RequirementText(BaseModel):
+    raw_text: str
+    project_name: Optional[str] = "default"
+
 class LoadCase(BaseModel):
     type: str
     magnitude_n: float

@@ -1,0 +1,16 @@
+# Virtual Environment
+venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# IDE settings
+.vscode/
+.idea/
+
+# Generated Output & Runtime Data
+reports/
+services/ai_reasoning/feedback_log.json
+services/intent_service/intent_db.json
