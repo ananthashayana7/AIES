@@ -1,5 +1,0 @@
-{
-  "Aluminium 6061": { "density_g_cm3": 2.7, "yield_strength_mpa": 276, "cost_per_kg": 2.5, "co2_kg_per_kg": 12.0 },
-  "Steel 304": { "density_g_cm3": 8.0, "yield_strength_mpa": 215, "cost_per_kg": 1.5, "co2_kg_per_kg": 4.0 },
-  "Titanium Gr5": { "density_g_cm3": 4.43, "yield_strength_mpa": 880, "cost_per_kg": 40.0, "co2_kg_per_kg": 55.0 }
-}
