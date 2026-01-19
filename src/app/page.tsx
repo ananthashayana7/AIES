@@ -1,80 +1,308 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import SpecInputForm from "@/components/SpecInputForm";
-import Visualizer from "@/components/Visualizer";
-import InstructionViewer from "@/components/InstructionViewer";
+// Cadence - Main Application Page
+// Redesigned with larger 3D viewer and collapsible spec panel
+
+import dynamic from 'next/dynamic';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
+import SpecInput from '@/components/SpecInput';
+import InfoPanel from '@/components/InfoPanel';
+import VariantSelector from '@/components/VariantSelector';
+import { useAppStore } from '@/store/appStore';
+
+// Dynamic import for 3D viewer (SSR disabled)
+const Viewer3D = dynamic(() => import('@/components/Viewer3D'), {
+  ssr: false,
+  loading: () => (
+    <div className="viewer-loading">
+      <div className="spinner" />
+      <span>Initializing 3D Engine...</span>
+    </div>
+  ),
+});
 
 export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<{ imageUrl: string | null; instructions: string[] }>({
-    imageUrl: null,
-    instructions: [],
-  });
-
-  const handleGenerate = async (spec: string) => {
-    setLoading(true);
-    setData({ imageUrl: null, instructions: [] }); // Reset
-
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec }),
-      });
-      const result = await response.json();
-      setData({
-        imageUrl: result.imageUrl,
-        instructions: result.instructions,
-      });
-    } catch (error) {
-      console.error("Failed to generate:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { variants, reset } = useAppStore();
+  const hasVariants = variants.length > 0;
+  const [specPanelCollapsed, setSpecPanelCollapsed] = useState(false);
+  const [infoPanelCollapsed, setInfoPanelCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
-      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
+    <div className="app-container">
+      {/* Background mesh gradient */}
+      <div className="bg-mesh" />
 
-      <main className="relativez-10 container mx-auto px-4 py-8 max-w-7xl h-screen flex flex-col">
-        <header className="mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
-              AI Design Assistant
-            </h1>
+      {/* Header */}
+      <header className="app-header">
+        <div className="logo-section">
+          <div className="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
           </div>
-          <div className="text-sm text-zinc-500">v1.0.0 (Prototype)</div>
-        </header>
-
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-          {/* Left Panel: Input */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
-            <SpecInputForm onSubmit={handleGenerate} isLoading={loading} />
-
-            <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-6 flex-1 hidden lg:block">
-              <h3 className="text-sm font-semibold text-zinc-400 mb-3 uppercase tracking-wider">Tips</h3>
-              <ul className="text-sm text-zinc-500 space-y-2 list-disc list-inside">
-                <li>Be specific about dimensions and materials.</li>
-                <li>Mention the intended environment (underwater, space, etc.).</li>
-                <li>Specify any constraints (weight, cost, manufacturing method).</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Right Panel: Output */}
-          <div className="lg:col-span-8 grid grid-rows-2 gap-6 h-full">
-            <Visualizer imageUrl={data.imageUrl} isLoading={loading} />
-            <InstructionViewer instructions={data.instructions} isLoading={loading} />
+          <div className="logo-text">
+            <h1>Cadence</h1>
+            <span>Parametric Design Intelligence</span>
           </div>
         </div>
+
+        <div className="header-actions">
+          <motion.button
+            className="action-btn new-btn"
+            onClick={reset}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <span>+</span> New Design
+          </motion.button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="app-main">
+        {/* Left Panel - Spec Input (collapsible) */}
+        <motion.aside
+          className={`panel panel-left glass-panel ${specPanelCollapsed ? 'collapsed' : ''}`}
+          animate={{ width: specPanelCollapsed ? 48 : 300 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <button
+            className="collapse-btn"
+            onClick={() => setSpecPanelCollapsed(!specPanelCollapsed)}
+          >
+            {specPanelCollapsed ? '→' : '←'}
+          </button>
+          {!specPanelCollapsed && <SpecInput />}
+        </motion.aside>
+
+        {/* Center - 3D Viewer (maximized) */}
+        <motion.section
+          className="panel panel-center"
+          layout
+        >
+          <div className="viewer-wrapper">
+            <Viewer3D />
+          </div>
+          <VariantSelector />
+        </motion.section>
+
+        {/* Right Panel - Info/Analysis (collapsible) */}
+        <motion.aside
+          className={`panel panel-right glass-panel ${infoPanelCollapsed ? 'collapsed' : ''}`}
+          animate={{ width: infoPanelCollapsed ? 48 : 360 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <button
+            className="collapse-btn right"
+            onClick={() => setInfoPanelCollapsed(!infoPanelCollapsed)}
+          >
+            {infoPanelCollapsed ? '←' : '→'}
+          </button>
+          {!infoPanelCollapsed && <InfoPanel />}
+        </motion.aside>
       </main>
+
+      <style jsx>{`
+        .app-container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          overflow: hidden;
+          position: relative;
+        }
+        
+        .bg-mesh {
+          position: fixed;
+          inset: 0;
+          background: var(--gradient-mesh);
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        /* Header */
+        .app-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 20px;
+          border-bottom: 1px solid var(--border-subtle);
+          background: rgba(12, 12, 20, 0.95);
+          backdrop-filter: blur(12px);
+          z-index: 100;
+          position: relative;
+        }
+
+        .logo-section {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .logo-icon {
+          width: 38px;
+          height: 38px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--gradient-primary);
+          border-radius: 10px;
+          color: #fff;
+          box-shadow: var(--glow-primary);
+        }
+
+        .logo-icon svg {
+          width: 20px;
+          height: 20px;
+        }
+
+        .logo-text h1 {
+          font-size: 22px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
+          background: var(--gradient-primary);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          margin: 0;
+        }
+
+        .logo-text span {
+          font-size: 10px;
+          color: var(--text-muted);
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .action-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+
+        .new-btn {
+          background: var(--gradient-primary);
+          color: #fff;
+          box-shadow: var(--glow-primary);
+        }
+
+        .new-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+        }
+
+        /* Main content */
+        .app-main {
+          flex: 1;
+          display: flex;
+          gap: 12px;
+          padding: 12px;
+          overflow: hidden;
+          position: relative;
+          z-index: 1;
+        }
+
+        .panel {
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+        }
+
+        .panel-left, .panel-right {
+          padding: 16px;
+          flex-shrink: 0;
+        }
+
+        .panel-left.collapsed, .panel-right.collapsed {
+          padding: 8px;
+        }
+
+        .panel-center {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          min-width: 0;
+        }
+
+        .viewer-wrapper {
+          flex: 1;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: var(--shadow-elevated);
+          border: 1px solid var(--border-subtle);
+        }
+
+        .collapse-btn {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 24px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(124, 58, 237, 0.2);
+          border: 1px solid rgba(124, 58, 237, 0.3);
+          border-radius: 6px;
+          color: var(--accent-primary);
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.2s;
+          z-index: 10;
+          right: -12px;
+        }
+
+        .collapse-btn.right {
+          right: auto;
+          left: -12px;
+        }
+
+        .collapse-btn:hover {
+          background: rgba(124, 58, 237, 0.3);
+        }
+
+        /* Loading state */
+        :global(.viewer-loading) {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          gap: 16px;
+          color: var(--text-muted);
+          font-size: 13px;
+          background: linear-gradient(180deg, #0c0c14 0%, #13131f 100%);
+        }
+
+        :global(.viewer-loading .spinner) {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(124, 58, 237, 0.2);
+          border-top-color: var(--accent-primary);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
