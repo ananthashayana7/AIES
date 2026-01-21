@@ -31,10 +31,14 @@ export default function InfoPanel() {
     }
 
     const tabs = [
-        { id: 'analysis', label: '📊 Analysis', icon: '📊' },
-        { id: 'procedures', label: '📋 Procedures', icon: '📋' },
-        { id: 'export', label: '💾 Export', icon: '💾' },
+        { id: 'insights', label: '📊 Insights', icon: '📊' },
+        { id: 'guidance', label: '📋 Guidance', icon: '📋' },
+        { id: 'audit', label: '💾 Audit', icon: '💾' },
     ] as const;
+
+    // Filter to ensure we only show valid tabs for this panel
+    // If activePanel is 'intent' or 'simulation', we might want to default to 'insights' in this view
+    // But for now, we'll let the store control it.
 
     return (
         <div className="info-panel">
@@ -58,9 +62,9 @@ export default function InfoPanel() {
                     exit={{ opacity: 0, y: -5 }}
                     className="tab-content"
                 >
-                    {activePanel === 'analysis' && <AnalysisTab variant={variant} />}
-                    {activePanel === 'procedures' && <ProceduresTab variant={variant} />}
-                    {activePanel === 'export' && <ExportTab variant={variant} />}
+                    {activePanel === 'insights' && <InsightsTab variant={variant} />}
+                    {activePanel === 'guidance' && <GuidanceTab variant={variant} />}
+                    {activePanel === 'audit' && <AuditTab variant={variant} />}
                 </motion.div>
             </AnimatePresence>
 
@@ -113,8 +117,8 @@ export default function InfoPanel() {
     );
 }
 
-// Analysis Tab - AI reasoning results
-function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+// Insights Tab (formerly Analysis) - AI reasoning results
+function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
     const { reviewSuggestion, reviewDecisions } = useAppStore();
 
     if (!variant) return null;
@@ -465,8 +469,8 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
     );
 }
 
-// Procedures Tab - Manufacturing steps & CAD Guidance
-function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+// Guidance Tab (formerly Procedures) - Manufacturing steps & CAD Guidance
+function GuidanceTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
     const [mode, setMode] = useState<'manufacturing' | 'cad'>('manufacturing');
     const intent = useDesignIntent();
 
@@ -722,8 +726,8 @@ function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVari
     );
 }
 
-// Export Tab
-function ExportTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+// Audit Tab (formerly Export) - Exports & Data Control
+function AuditTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
     if (!variant) return null;
 
     const handleExportJSON = () => {
@@ -756,8 +760,8 @@ function ExportTab({ variant }: { variant: ReturnType<typeof useSelectedVariant>
     return (
         <div className="export-tab">
             <div className="export-info">
-                <h3>📦 Export Options</h3>
-                <p>Export your design data locally. No data is sent to any server.</p>
+                <h3>📦 Audit & Export</h3>
+                <p>Export design data for compliance and manufacturing handover.</p>
             </div>
 
             <div className="export-options">

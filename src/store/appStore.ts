@@ -17,7 +17,8 @@ interface AppState {
     // UI state
     isProcessing: boolean;
     showJsonEditor: boolean;
-    activePanel: 'specs' | 'analysis' | 'procedures' | 'export';
+    // Updated panel names to match main branch
+    activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation';
 
     // Review state
     reviewDecisions: Record<string, { decision: 'accepted' | 'rejected', timestamp: number }>;
@@ -27,7 +28,7 @@ interface AppState {
     loadExample: () => void;
     generateVariantsFromIntent: () => void;
     selectVariant: (id: string) => void;
-    setActivePanel: (panel: 'specs' | 'analysis' | 'procedures' | 'export') => void;
+    setActivePanel: (panel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation') => void;
     toggleJsonEditor: () => void;
     reviewSuggestion: (id: string, decision: 'accepted' | 'rejected') => void;
     reset: () => void;
@@ -42,7 +43,7 @@ export const useAppStore = create<AppState>()(
             selectedVariantId: null,
             isProcessing: false,
             showJsonEditor: false,
-            activePanel: 'specs',
+            activePanel: 'intent', // Was 'specs'
             reviewDecisions: {},
 
             // Actions
@@ -72,7 +73,7 @@ export const useAppStore = create<AppState>()(
                         variants,
                         selectedVariantId: variants[0]?.id || null,
                         isProcessing: false,
-                        activePanel: 'analysis',
+                        activePanel: 'insights', // Was 'analysis'
                     });
                 }, 500);
             },
@@ -105,7 +106,7 @@ export const useAppStore = create<AppState>()(
                     selectedVariantId: null,
                     isProcessing: false,
                     showJsonEditor: false,
-                    activePanel: 'specs',
+                    activePanel: 'intent', // Was 'specs'
                     reviewDecisions: {},
                 });
             },

@@ -129,19 +129,9 @@ export default function SpecInput() {
   };
 
   const handleGenerate = () => {
-    // Parse description for potential overrides
-    const parsedParams = parseDescription(description);
-
     // Build intent from parameters
     const getParam = (name: string): number => {
-      // Check table parameters first (user override)
-      let p = parameters.find(x => x.name.toLowerCase().includes(name.toLowerCase()));
-
-      // If not in table, check parsed parameters
-      if (!p || !p.value) {
-        p = parsedParams.find(x => x.name.toLowerCase().includes(name.toLowerCase()));
-      }
-
+      const p = parameters.find(x => x.name.toLowerCase().includes(name.toLowerCase()));
       return p ? parseFloat(p.value) || 0 : 0;
     };
 
@@ -167,19 +157,17 @@ export default function SpecInput() {
       constraints: {
         minWall: getParam('wall') || 2,
         maxMassG: 500,
-        manufacturing: process as 'CNC_machining' | 'additive' | 'sheet_metal' | 'casting',
+        manufacturing: process as any,
       },
       variants: ['strength', 'weight', 'cost'],
       // Store raw params for AI generation
       customParams: Object.fromEntries(parameters.map(p => [p.name, { value: p.value, unit: p.unit }])),
       aiDescription: description,
-    } as DesignIntent;
+    } as any;
 
     setDesignIntent(intent);
     setTimeout(() => generateVariantsFromIntent(), 100);
   };
-
-  const isAmbiguous = description.length > 0 && description.length < 20 && !parameters.some(p => p.value);
 
   return (
     <div className="spec-input">
@@ -196,13 +184,6 @@ export default function SpecInput() {
           placeholder="Describe your part in plain English...&#10;e.g. Fidget spinner with 3 arms, 80mm diameter..."
           rows={3}
         />
-
-        {isAmbiguous && (
-            <div className="ambiguity-warning">
-                ⚠️ Description might be too vague. Consider adding dimensions or parameters below.
-            </div>
-        )}
-
         <div className="examples">
           <span className="label">Examples:</span>
           <div className="example-chips">
@@ -226,7 +207,7 @@ export default function SpecInput() {
           <button className="add-btn" onClick={addParameter}>+ Add</button>
         </div>
         <div className="params-table">
-          {parameters.map((param) => (
+          {parameters.map((param, index) => (
             <div key={param.id} className="param-row">
               <input
                 type="text"
@@ -531,18 +512,6 @@ export default function SpecInput() {
           outline: none;
           border-color: var(--accent-primary);
         }
-
-        .ambiguity-warning {
-            padding: 8px 12px;
-            background: rgba(245, 158, 11, 0.15);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            border-radius: 8px;
-            color: #fbbf24;
-            font-size: 11px;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
