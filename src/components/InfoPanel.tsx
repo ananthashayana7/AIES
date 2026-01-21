@@ -4,7 +4,9 @@
 // The core "engineering intelligence" display
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSelectedVariant, useAppStore } from '@/store/appStore';
+import { useState } from 'react';
+import { useSelectedVariant, useAppStore, useDesignIntent } from '@/store/appStore';
+import { generateCADSteps } from '@/lib/guidance/cadGuidanceGenerator';
 
 export default function InfoPanel() {
     const variant = useSelectedVariant();
@@ -104,6 +106,7 @@ export default function InfoPanel() {
         .tab-content {
           flex: 1;
           overflow-y: auto;
+          padding-right: 4px;
         }
       `}</style>
         </div>
@@ -112,9 +115,16 @@ export default function InfoPanel() {
 
 // Analysis Tab - AI reasoning results
 function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+    const { reviewSuggestion, reviewDecisions } = useAppStore();
+
     if (!variant) return null;
 
     const { aiReasoning, ruleResults } = variant;
+
+    // Calculate audit stats
+    const decisions = Object.values(reviewDecisions);
+    const acceptedCount = decisions.filter(d => d.decision === 'accepted').length;
+    const rejectedCount = decisions.filter(d => d.decision === 'rejected').length;
 
     return (
         <div className="analysis-tab">
@@ -171,24 +181,66 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
                 ))}
             </div>
 
-            {/* Suggestions */}
+            {/* Suggestions with Review */}
             {aiReasoning.suggestions.length > 0 && (
                 <div className="section">
                     <h3>💡 Optimization Suggestions</h3>
-                    {aiReasoning.suggestions.map((s, i) => (
-                        <div key={i} className="suggestion-item">
-                            <div className="param-change">
-                                <span className="param">{s.parameter}</span>
-                                <span className="values">
-                                    {s.currentValue} → {s.suggestedValue} ({s.delta > 0 ? '+' : ''}{s.delta})
-                                </span>
+                    {aiReasoning.suggestions.map((s, i) => {
+                        const status = reviewDecisions[s.id]?.decision;
+                        return (
+                            <div key={s.id || i} className={`suggestion-item ${status || ''}`}>
+                                <div className="param-change">
+                                    <span className="param">{s.parameter}</span>
+                                    <span className="values">
+                                        {s.currentValue} → {s.suggestedValue} ({s.delta > 0 ? '+' : ''}{s.delta})
+                                    </span>
+                                </div>
+                                <p>{s.rationale}</p>
+                                <small>Expected: {s.expectedImprovement}</small>
+
+                                <div className="review-actions">
+                                    {status ? (
+                                        <div className={`status-badge ${status}`}>
+                                            {status === 'accepted' ? '✓ Accepted' : '✗ Rejected'}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button
+                                                className="review-btn accept"
+                                                onClick={() => reviewSuggestion(s.id, 'accepted')}
+                                            >
+                                                Accept
+                                            </button>
+                                            <button
+                                                className="review-btn reject"
+                                                onClick={() => reviewSuggestion(s.id, 'rejected')}
+                                            >
+                                                Reject
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                            <p>{s.rationale}</p>
-                            <small>Expected: {s.expectedImprovement}</small>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
+
+            {/* Audit Log Summary */}
+            <div className="section">
+                <h3>📋 Review Audit Log</h3>
+                <div className="audit-box">
+                    <div className="audit-stat">
+                        <span>Accepted:</span> <strong>{acceptedCount}</strong>
+                    </div>
+                    <div className="audit-stat">
+                        <span>Rejected:</span> <strong>{rejectedCount}</strong>
+                    </div>
+                    <div className="audit-stat">
+                        <span>Pending:</span> <strong>{aiReasoning.suggestions.length - acceptedCount - rejectedCount}</strong>
+                    </div>
+                </div>
+            </div>
 
             <style jsx>{`
         .analysis-tab {
@@ -204,7 +256,7 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
           margin: 0 0 12px 0;
         }
 
-        .summary-box {
+        .summary-box, .audit-box {
           padding: 12px;
           background: rgba(0, 0, 0, 0.3);
           border-radius: 8px;
@@ -217,6 +269,21 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
           font-size: 13px;
           color: #d0d0d0;
           line-height: 1.5;
+        }
+
+        .audit-box {
+            display: flex;
+            gap: 20px;
+        }
+
+        .audit-stat span {
+            color: #808080;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+
+        .audit-stat strong {
+            color: #fff;
         }
 
         .risk-level {
@@ -312,6 +379,15 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
           margin-bottom: 8px;
         }
 
+        .suggestion-item.accepted {
+           background: rgba(16, 185, 129, 0.1);
+        }
+
+        .suggestion-item.rejected {
+           background: rgba(239, 68, 68, 0.1);
+           opacity: 0.7;
+        }
+
         .param-change {
           display: flex;
           justify-content: space-between;
@@ -323,6 +399,9 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
           color: #60a5fa;
           font-size: 12px;
         }
+
+        .suggestion-item.accepted .param { color: #10b981; }
+        .suggestion-item.rejected .param { color: #ef4444; }
 
         .values {
           font-family: monospace;
@@ -340,14 +419,60 @@ function AnalysisTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
           color: #707070;
           font-size: 11px;
         }
+
+        .review-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .review-btn {
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .review-btn.accept {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .review-btn.reject {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .review-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.2);
+        }
+
+        .status-badge {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-badge.accepted { color: #10b981; }
+        .status-badge.rejected { color: #ef4444; }
       `}</style>
         </div>
     );
 }
 
-// Procedures Tab - Manufacturing steps
+// Procedures Tab - Manufacturing steps & CAD Guidance
 function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+    const [mode, setMode] = useState<'manufacturing' | 'cad'>('manufacturing');
+    const intent = useDesignIntent();
+
     if (!variant) return null;
+
+    const cadSteps = intent ? generateCADSteps(intent, variant) : [];
 
     const procedures = [
         {
@@ -404,22 +529,62 @@ function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVari
 
     return (
         <div className="procedures-tab">
-            <div className="variant-badge">
-                {variant.displayName}
+            <div className="header-row">
+                <div className="variant-badge">
+                    {variant.displayName}
+                </div>
+                <div className="mode-toggle">
+                    <button
+                        className={mode === 'manufacturing' ? 'active' : ''}
+                        onClick={() => setMode('manufacturing')}
+                    >
+                        Mfg
+                    </button>
+                    <button
+                        className={mode === 'cad' ? 'active' : ''}
+                        onClick={() => setMode('cad')}
+                    >
+                        CAD
+                    </button>
+                </div>
             </div>
 
-            {procedures.map((proc) => (
-                <div key={proc.step} className="procedure-item">
-                    <div className="step-number">{proc.step}</div>
-                    <div className="step-content">
-                        <h4>{proc.title}</h4>
-                        <p>{proc.description}</p>
-                        <ul>
-                            {proc.details.map((d, i) => <li key={i}>{d}</li>)}
-                        </ul>
+            {mode === 'manufacturing' ? (
+                procedures.map((proc) => (
+                    <div key={proc.step} className="procedure-item">
+                        <div className="step-number">{proc.step}</div>
+                        <div className="step-content">
+                            <h4>{proc.title}</h4>
+                            <p>{proc.description}</p>
+                            <ul>
+                                {proc.details.map((d, i) => <li key={i}>{d}</li>)}
+                            </ul>
+                        </div>
                     </div>
+                ))
+            ) : (
+                <div className="cad-steps">
+                    {cadSteps.map((step) => (
+                        <div key={step.stepNumber} className="procedure-item">
+                            <div className="step-number cad">{step.stepNumber}</div>
+                            <div className="step-content">
+                                <div className="step-header">
+                                    <h4>{step.action}</h4>
+                                    <span className="tool-icon">{step.toolIcon}</span>
+                                </div>
+                                <p>{step.description}</p>
+                                {step.parameters && (
+                                    <div className="step-params">
+                                        {Object.entries(step.parameters).map(([k, v]) => (
+                                            <span key={k} className="param-tag">{k}: {v}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            ))}
+            )}
 
             <style jsx>{`
         .procedures-tab {
@@ -428,14 +593,42 @@ function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVari
           gap: 12px;
         }
 
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .variant-badge {
-          padding: 8px 16px;
+          padding: 6px 12px;
           background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(139, 92, 246, 0.2));
           border-radius: 8px;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
           color: #c0c0c0;
-          text-align: center;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .mode-toggle button {
+            padding: 4px 10px;
+            border: none;
+            background: transparent;
+            color: #606060;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .mode-toggle button.active {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
         }
 
         .procedure-item {
@@ -460,8 +653,19 @@ function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVari
           flex-shrink: 0;
         }
 
+        .step-number.cad {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
         .step-content {
           flex: 1;
+        }
+
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
         }
 
         .step-content h4 {
@@ -469,6 +673,10 @@ function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVari
           font-size: 13px;
           font-weight: 600;
           color: #e0e0e0;
+        }
+
+        .tool-icon {
+            font-size: 16px;
         }
 
         .step-content p {
@@ -486,6 +694,28 @@ function ProceduresTab({ variant }: { variant: ReturnType<typeof useSelectedVari
 
         .step-content li {
           margin: 2px 0;
+        }
+
+        .step-params {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .param-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            color: #a0a0a0;
+            font-family: monospace;
+        }
+
+        .cad-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
       `}</style>
         </div>
