@@ -1,6 +1,7 @@
 // AI Reasoning Layer - Probabilistic reasoning on structured data
 // Operates on Design Intent + CAD Snapshot, NOT geometry
 
+import { v4 as uuidv4 } from 'uuid';
 import { DesignIntent, VariantType } from '../schemas/designIntent';
 import { CADSnapshot } from '../schemas/cadSnapshot';
 import { RuleEngineResults } from '../rules/ruleEngine';
@@ -27,6 +28,7 @@ export interface TradeOff {
 }
 
 export interface ParameterSuggestion {
+    id: string;
     parameter: string;
     currentValue: number;
     suggestedValue: number;
@@ -261,13 +263,14 @@ function generateSuggestions(
     intent: DesignIntent,
     snapshot: CADSnapshot,
     variantType: VariantType,
-    ruleResults: RuleEngineResults
+    _ruleResults: RuleEngineResults
 ): ParameterSuggestion[] {
     const suggestions: ParameterSuggestion[] = [];
 
     // Suggest based on mass constraints
     if (snapshot.massProperties.mass > intent.constraints.maxMassG * 0.9) {
         suggestions.push({
+            id: uuidv4(),
             parameter: 'wallThickness',
             currentValue: snapshot.parameters.wallThickness,
             suggestedValue: snapshot.parameters.wallThickness - 0.5,
@@ -280,6 +283,7 @@ function generateSuggestions(
     // Suggest fillet optimization
     if (variantType === 'strength' && snapshot.parameters.filletRadius < 4) {
         suggestions.push({
+            id: uuidv4(),
             parameter: 'filletRadius',
             currentValue: snapshot.parameters.filletRadius,
             suggestedValue: 6,

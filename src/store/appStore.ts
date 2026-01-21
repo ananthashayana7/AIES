@@ -3,6 +3,7 @@
 // Zustand Store v0.9 (SRS compliant)
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { DesignIntent, exampleDesignIntent } from '../lib/schemas/designIntent';
 import { GeneratedVariant, generateVariants } from '../lib/variants/variantGenerator';
 
@@ -37,7 +38,16 @@ interface AppState {
 
     // UI state
     isProcessing: boolean;
+ feature/ai-design-enhancements-2705611776119386679
+    showJsonEditor: boolean;
+    // Updated panel names to match main branch
     activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation';
+
+    // Review state
+    reviewDecisions: Record<string, { decision: 'accepted' | 'rejected', timestamp: number }>;
+
+    activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation';
+ main
 
     // Actions
     setDesignIntent: (intent: DesignIntent) => void;
@@ -49,12 +59,23 @@ interface AppState {
     rejectSuggestion: (id: string, reason?: string) => void;
     selectVariant: (id: string) => void;
     setActivePanel: (panel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation') => void;
+feature/ai-design-enhancements-2705611776119386679
+    toggleJsonEditor: () => void;
+    reviewSuggestion: (id: string, decision: 'accepted' | 'rejected') => void;
+
+ main
     reset: () => void;
 
     // Audit/Export Trigger
     exportTrigger: 'glb' | 'pdf' | 'json' | null;
     triggerExport: (type: 'glb' | 'pdf' | 'json' | null) => void;
 }
+
+ feature/ai-design-enhancements-2705611776119386679
+export const useAppStore = create<AppState>()(
+    persist(
+        (set, get) => ({
+            // Initial state
 
 export const useAppStore = create<AppState>((set, get) => ({
     designIntent: null,
@@ -179,6 +200,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     reset: () => {
         set({
+main
             designIntent: null,
             variants: [],
             selectedVariantId: null,
@@ -187,6 +209,87 @@ export const useAppStore = create<AppState>((set, get) => ({
             ruleCheckResult: null,
             reviewDecisions: [],
             isProcessing: false,
+feature/ai-design-enhancements-2705611776119386679
+            showJsonEditor: false,
+            activePanel: 'intent', // Was 'specs'
+            reviewDecisions: {},
+
+            // Actions
+            setDesignIntent: (intent) => {
+                set({ designIntent: intent, variants: [], selectedVariantId: null, reviewDecisions: {} });
+            },
+
+            loadExample: () => {
+                set({
+                    designIntent: exampleDesignIntent,
+                    variants: [],
+                    selectedVariantId: null,
+                    reviewDecisions: {},
+                });
+            },
+
+            generateVariantsFromIntent: () => {
+                const { designIntent } = get();
+                if (!designIntent) return;
+
+                set({ isProcessing: true });
+
+                // Simulate processing time for UX
+                setTimeout(() => {
+                    const variants = generateVariants(designIntent);
+                    set({
+                        variants,
+                        selectedVariantId: variants[0]?.id || null,
+                        isProcessing: false,
+                        activePanel: 'insights', // Was 'analysis'
+                    });
+                }, 500);
+            },
+
+            selectVariant: (id) => {
+                set({ selectedVariantId: id });
+            },
+
+            setActivePanel: (panel) => {
+                set({ activePanel: panel });
+            },
+
+            toggleJsonEditor: () => {
+                set((state) => ({ showJsonEditor: !state.showJsonEditor }));
+            },
+
+            reviewSuggestion: (id, decision) => {
+                set((state) => ({
+                    reviewDecisions: {
+                        ...state.reviewDecisions,
+                        [id]: { decision, timestamp: Date.now() },
+                    },
+                }));
+            },
+
+            reset: () => {
+                set({
+                    designIntent: null,
+                    variants: [],
+                    selectedVariantId: null,
+                    isProcessing: false,
+                    showJsonEditor: false,
+                    activePanel: 'intent', // Was 'specs'
+                    reviewDecisions: {},
+                });
+            },
+        }),
+        {
+            name: 'cadence-storage',
+            partialize: (state) => ({
+                designIntent: state.designIntent,
+                variants: state.variants,
+                reviewDecisions: state.reviewDecisions,
+            }),
+        }
+    )
+);
+
             activePanel: 'intent',
             exportTrigger: null,
         });
@@ -195,6 +298,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     exportTrigger: null,
     triggerExport: (type) => set({ exportTrigger: type }),
 }));
+main
 
 // Selectors
 export const useSelectedVariant = () => {

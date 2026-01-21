@@ -3,9 +3,27 @@
 // Advanced Design Intent Editor v0.9+ 
 // Supports high-complexity parameter systems & multi-scenario modeling.
 
+ feature/ai-design-enhancements-2705611776119386679
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { useAppStore } from '@/store/appStore';
+import { DesignIntent } from '@/lib/schemas/designIntent';
+import { v4 as uuidv4 } from 'uuid';
+
+interface ParameterRow {
+  id: string;
+  name: string;
+  value: string;
+  unit: string;
+}
+
+// Common units for autocomplete
+const commonUnits = ['mm', 'cm', 'm', 'in', 'μm', 'deg', '°', 'qty', 'g', 'kg', 'N', 'MPa', '%'];
+
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { DesignIntent, IntentConstraint } from '@/lib/schemas/designIntent';
+main
 
 import { MATERIAL_LIBRARY } from '@/lib/simulation/materialLibrary';
 
