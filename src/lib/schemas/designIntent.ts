@@ -1,68 +1,86 @@
-// Design Intent Schema v0.9 (Aligned with SRS 5.1)
-// This is the source of truth for AI reasoning and design guidance.
+// Design Intent Schema - Machine-readable engineering semantics
+// This is what AI reasons over, NOT geometry
 
-export interface IntentConstraint {
-    id: string;
-    type: 'bound' | 'tolerance' | 'interface';
-    expression: string;
-    severity: 'blocker' | 'warn' | 'info';
+export interface Envelope {
+    L: number;
+    W: number;
+    H: number;
+    units: 'mm' | 'in';
 }
+
+export interface Material {
+    name: string;
+    finish: string;
+    Ra?: number; // Surface roughness in μm
+}
+
+export interface MountingHole {
+    count: number;
+    thread: string; // e.g., "M4", "M6", "1/4-20"
+    pattern: 'rectangular' | 'circular' | 'linear';
+    edgeOffset: number;
+}
+
+export interface EdgeStyle {
+    type: 'fillet' | 'chamfer' | 'sharp';
+    radius?: number | [number, number]; // range for variants
+}
+
+export interface Pocket {
+    enabled: boolean;
+    maxDepth: number;
+}
+
+export interface Features {
+    mountingHoles?: MountingHole;
+    edgeStyle?: EdgeStyle;
+    pockets?: Pocket;
+}
+
+export interface Constraints {
+    minWall: number;
+    maxMassG: number;
+    manufacturing: 'CNC_machining' | 'additive' | 'sheet_metal' | 'casting';
+}
+
+export type VariantType = 'strength' | 'weight' | 'cost';
 
 export interface DesignIntent {
-    part_id: string;
-    revision: string;
-    materials: string[];
+    id: string;
+    partType: string;
+    envelope: Envelope;
+    material: Material;
+    features: Features;
+    constraints: Constraints;
+    variants: VariantType[];
 
-    // Named global parameters (e.g., "length_mm": 150)
-    parameters: Record<string, number | string>;
-
-    // Formal constraints
-    constraints: IntentConstraint[];
-
-    // High-level objectives (e.g., "Minimize weight", "Maximize stiffness")
-    objectives: string[];
-
-    // Acceptance criteria - what must be met
-    acceptance: {
-        max_mass_g: number;
-        safety_factor_min: number;
-        // Allows for additional criteria
-        [key: string]: any;
+    // Acceptance criteria - what AI validates against
+    acceptanceCriteria?: {
+        maxStressMPa?: number;
+        minSafetyFactor?: number;
+        maxDeflectionMm?: number;
     };
 
-    // Guidance history & progress (F6)
-    guidance_steps?: {
-        step: number;
-        title: string;
-        description: string;
-        completed: boolean;
-        notes?: string;
-    }[];
+    // Metadata
+    customParams?: Record<string, { value: string; unit: string }>;
+    aiDescription?: string;
 }
 
-// Example bracket instance following v0.9 SRS
+// Example spec from requirements
 export const exampleDesignIntent: DesignIntent = {
-    part_id: 'BRKT-001',
-    revision: 'A.0',
-    materials: ['Aluminum 6061-T6'],
-    parameters: {
-        "length_mm": 150,
-        "width_mm": 80,
-        "height_mm": 20,
-        "hole_dia_mm": 6.5,
-        "material_stock": "20mm Plate"
+    id: 'example-bracket-001',
+    partType: 'mounting_bracket',
+    envelope: { L: 150, W: 80, H: 20, units: 'mm' },
+    material: { name: 'Aluminum 6061-T6', finish: 'anodized matte black', Ra: 1.6 },
+    features: {
+        mountingHoles: { count: 4, thread: 'M4', pattern: 'rectangular', edgeOffset: 10 },
+        edgeStyle: { type: 'fillet', radius: [3, 6] },
+        pockets: { enabled: true, maxDepth: 3 },
     },
-    constraints: [
-        { id: 'c1', type: 'bound', expression: 'thickness_mm >= 3.0', severity: 'blocker' },
-        { id: 'c2', type: 'interface', expression: 'mounting_holes align with Rail-99', severity: 'blocker' },
-        { id: 'c3', type: 'tolerance', expression: 'hole_positions +/- 0.1mm', severity: 'warn' }
-    ],
-    objectives: [
-        "Minimize total mass",
-        "Maintain safety factor > 2.0"
-    ],
-    acceptance: {
-        max_mass_g: 500,
-        safety_factor_min: 2.0
-    }
+    constraints: {
+        minWall: 2,
+        maxMassG: 200,
+        manufacturing: 'CNC_machining',
+    },
+    variants: ['strength', 'weight', 'cost'],
 };

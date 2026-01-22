@@ -1,12 +1,13 @@
 'use client';
 
-// Info Panel v0.9 (SRS Compliant) - Right-side Analysis/Guidance Panel
+// Info Panel - Displays AI reasoning, rule results, and procedure notes
+// The core "engineering intelligence" display
 
- feature/ai-design-enhancements-2705611776119386679
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { useSelectedVariant, useAppStore, useDesignIntent } from '@/store/appStore';
 import { generateCADSteps } from '@/lib/guidance/cadGuidanceGenerator';
+import { jsPDF } from 'jspdf';
 
 export default function InfoPanel() {
     const variant = useSelectedVariant();
@@ -34,11 +35,8 @@ export default function InfoPanel() {
         { id: 'insights', label: '📊 Insights', icon: '📊' },
         { id: 'guidance', label: '📋 Guidance', icon: '📋' },
         { id: 'audit', label: '💾 Audit', icon: '💾' },
+        { id: 'simulation', label: '🧪 Sim', icon: '🧪' },
     ] as const;
-
-    // Filter to ensure we only show valid tabs for this panel
-    // If activePanel is 'intent' or 'simulation', we might want to default to 'insights' in this view
-    // But for now, we'll let the store control it.
 
     return (
         <div className="info-panel">
@@ -65,96 +63,60 @@ export default function InfoPanel() {
                     {activePanel === 'insights' && <InsightsTab variant={variant} />}
                     {activePanel === 'guidance' && <GuidanceTab variant={variant} />}
                     {activePanel === 'audit' && <AuditTab variant={variant} />}
+                    {activePanel === 'simulation' && <SimulationTab variant={variant} />}
                 </motion.div>
             </AnimatePresence>
 
             <style jsx>{`
-
-import { useAppStore } from '@/store/appStore';
-
-export default function InfoPanel() {
-  const { activePanel, setActivePanel, variants, selectedVariantId } = useAppStore();
-  const variant = variants.find(v => v.id === selectedVariantId) || variants[0];
-
-  const tabs = [
-    { id: 'guidance', label: 'CAD GUIDANCE' },
-    { id: 'insights', label: 'AI INSIGHTS' },
-    { id: 'simulation', label: 'MATERIAL SIM' },
-    { id: 'audit', label: 'AUDIT & REVIEW' },
-  ] as const;
-
-  return (
-    <div className="info-panel">
-      <div className="tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`tab ${activePanel === tab.id ? 'active' : ''}`}
-            onClick={() => setActivePanel(tab.id as any)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="tab-content">
-        {activePanel === 'guidance' && <GuidanceTab variant={variant} />}
-        {activePanel === 'insights' && <InsightsTab variant={variant} />}
-        {activePanel === 'simulation' && <SimulationTab />}
-        {activePanel === 'audit' && <AuditTab variant={variant} />}
-      </div>
-
-      <style jsx>{`
- main
         .info-panel {
-          height: 100%;
           display: flex;
           flex-direction: column;
-          background: #050505;
-          color: #fff;
-          font-family: var(--font-sans);
+          height: 100%;
+          overflow: hidden;
         }
 
         .tabs {
           display: flex;
-          border-bottom: 1px solid #1a1a1a;
-          background: #000;
+          gap: 4px;
+          padding: 4px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 10px;
+          margin-bottom: 16px;
         }
 
         .tab {
           flex: 1;
-          padding: 12px;
+          padding: 10px 12px;
           background: transparent;
           border: none;
-          border-bottom: 2px solid transparent;
-          color: #666;
-          font-size: 10px;
-          font-weight: 800;
+          border-radius: 8px;
+          color: #808080;
+          font-size: 12px;
+          font-weight: 500;
           cursor: pointer;
-          letter-spacing: 0.5px;
+          transition: all 0.2s;
         }
 
         .tab.active {
+          background: rgba(255, 255, 255, 0.1);
           color: #fff;
-          border-bottom-color: #fff;
+        }
+
+        .tab:hover:not(.active) {
+          color: #c0c0c0;
         }
 
         .tab-content {
           flex: 1;
           overflow-y: auto;
- feature/ai-design-enhancements-2705611776119386679
           padding-right: 4px;
-
-          padding: 20px;
- main
         }
       `}</style>
-    </div>
-  );
+        </div>
+    );
 }
 
- feature/ai-design-enhancements-2705611776119386679
-// Insights Tab (formerly Analysis) - AI reasoning results
+// Insights Tab (formerly Analysis)
 function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
     const { reviewSuggestion, reviewDecisions } = useAppStore();
 
@@ -169,7 +131,6 @@ function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
 
     return (
         <div className="analysis-tab">
-            {/* AI Summary */}
             <div className="section">
                 <h3>🤖 AI Reasoning Summary</h3>
                 <div className="summary-box">
@@ -177,7 +138,6 @@ function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
                 </div>
             </div>
 
-            {/* Risk Scores */}
             <div className="section">
                 <h3>⚠️ Risk Assessment</h3>
                 <div className={`risk-level ${aiReasoning.overallRiskLevel}`}>
@@ -205,7 +165,6 @@ function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
                 ))}
             </div>
 
-            {/* Rule Results */}
             <div className="section">
                 <h3>✓ Rule Engine ({ruleResults.score}%)</h3>
                 {ruleResults.results.map((rule, i) => (
@@ -222,7 +181,6 @@ function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
                 ))}
             </div>
 
-            {/* Suggestions with Review */}
             {aiReasoning.suggestions.length > 0 && (
                 <div className="section">
                     <h3>💡 Optimization Suggestions</h3>
@@ -267,7 +225,6 @@ function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
                 </div>
             )}
 
-            {/* Audit Log Summary */}
             <div className="section">
                 <h3>📋 Review Audit Log</h3>
                 <div className="audit-box">
@@ -345,70 +302,53 @@ function InsightsTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
         }
 
         .risk-header {
-
-// Guidance Tab - SRS F6 Step-by-Step CAD Guidance
-function GuidanceTab({ variant }: { variant: any }) {
-  if (!variant) return <div className="empty">Generate guidance to view steps.</div>;
-
-  return (
-    <div className="guidance-tab">
-      <div className="header">
-        <h2>SOLIDWORKS WORKFLOW</h2>
-        <p className="sub">{variant.displayName}</p>
-      </div>
-
-      <div className="steps">
-        {variant.guidance.map((g: any, i: number) => (
-          <div key={i} className="step-card">
-            <div className="step-num">{g.step}</div>
-            <div className="step-content">
-              <h3>{g.title}</h3>
-              <p className="description">{g.description}</p>
-              {g.rationale && (
-                <p className="rationale">
-                  <strong>Rationale:</strong> {g.rationale}
-                </p>
-              )}
-              {g.linkToIntent && (
-                <p className="link">
-                  Linked to: <code>{g.linkToIntent}</code>
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <style jsx>{`
-        .guidance-tab { font-family: var(--font-sans); }
-        .header { margin-bottom: 24px; border-bottom: 1px solid #1a1a1a; padding-bottom: 16px; }
-        .header h2 { font-size: 14px; margin: 0 0 4px 0; letter-spacing: 1px; color: #fff; }
-        .header .sub { font-size: 10px; color: #666; margin: 0; }
-
-        .steps { display: flex; flex-direction: column; gap: 16px; }
-        .step-card {
           display: flex;
-          gap: 16px;
-          padding: 16px;
-          background: #000;
-          border: 1px solid #1a1a1a;
+          justify-content: space-between;
+          font-size: 12px;
+          margin-bottom: 4px;
         }
 
-        .step-num {
-          width: 32px;
-          height: 32px;
-          background: #fff;
-          color: #000;
-main
+        .risk-header .score {
+          color: #808080;
+        }
+
+        .risk-bar {
+          height: 4px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 2px;
+          overflow: hidden;
+        }
+
+        .risk-fill {
+          height: 100%;
+          transition: width 0.3s ease;
+        }
+
+        .risk-factors {
+          margin: 8px 0 0 0;
+          padding-left: 16px;
+          font-size: 11px;
+          color: #707070;
+        }
+
+        .rule-item {
           display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 800;
+          gap: 10px;
+          padding: 10px;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          margin-bottom: 8px;
+          border-left: 3px solid;
+        }
+
+        .rule-item.pass { border-color: #10b981; }
+        .rule-item.warning { border-color: #f59e0b; }
+        .rule-item.error { border-color: #ef4444; }
+
+        .rule-icon {
           font-size: 14px;
-          flex-shrink: 0;
         }
 
- feature/ai-design-enhancements-2705611776119386679
         .rule-content {
           flex: 1;
         }
@@ -469,19 +409,13 @@ main
 
         .suggestion-item p {
           margin: 0 0 4px 0;
-
-        .step-content { flex: 1; }
-        .step-content h3 {
- main
           font-size: 12px;
-          margin: 0 0 8px 0;
-          color: #fff;
-          font-weight: 700;
+          color: #c0c0c0;
         }
 
-        .description {
+        .suggestion-item small {
+          color: #707070;
           font-size: 11px;
-feature/ai-design-enhancements-2705611776119386679
         }
 
         .review-actions {
@@ -529,7 +463,7 @@ feature/ai-design-enhancements-2705611776119386679
     );
 }
 
-// Guidance Tab (formerly Procedures) - Manufacturing steps & CAD Guidance
+// Guidance Tab
 function GuidanceTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
     const [mode, setMode] = useState<'manufacturing' | 'cad'>('manufacturing');
     const intent = useDesignIntent();
@@ -693,25 +627,27 @@ function GuidanceTab({ variant }: { variant: ReturnType<typeof useSelectedVarian
         .mode-toggle button.active {
             background: rgba(255,255,255,0.1);
             color: #fff;
-
-          color: #ccc;
-          line-height: 1.5;
-          margin: 0 0 8px 0;
- main
         }
 
-        .rationale {
-          font-size: 10px;
-          color: #888;
-          margin: 8px 0 0 0;
-          padding-top: 8px;
-          border-top: 1px solid #111;
-          line-height: 1.4;
+        .procedure-item {
+          display: flex;
+          gap: 12px;
+          padding: 12px;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 10px;
         }
 
-        .rationale strong {
+        .step-number {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #3b82f6, #2563eb);
+          border-radius: 50%;
+          font-size: 12px;
+          font-weight: 700;
           color: #fff;
-feature/ai-design-enhancements-2705611776119386679
           flex-shrink: 0;
         }
 
@@ -752,27 +688,10 @@ feature/ai-design-enhancements-2705611776119386679
           padding-left: 14px;
           font-size: 11px;
           color: #707070;
-
         }
 
-        .link {
-          font-size: 9px;
-          color: #666;
-          margin: 4px 0 0 0;
-        }
-
-        .link code {
-          color: #888;
-          background: #111;
-          padding: 2px 4px;
- main
-        }
-
-        .empty {
-          color: #444;
-          font-size: 10px;
-          text-align: center;
-          padding: 40px;
+        .step-content li {
+          margin: 2px 0;
         }
 
         .step-params {
@@ -797,13 +716,14 @@ feature/ai-design-enhancements-2705611776119386679
             gap: 12px;
         }
       `}</style>
-    </div>
-  );
+        </div>
+    );
 }
 
-feature/ai-design-enhancements-2705611776119386679
-// Audit Tab (formerly Export) - Exports & Data Control
+// Audit Tab (Exports & Data Control)
 function AuditTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+    const intent = useDesignIntent();
+
     if (!variant) return null;
 
     const handleExportJSON = () => {
@@ -819,8 +739,66 @@ function AuditTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> 
     };
 
     const handleExportPDF = () => {
-        alert('PDF export would use jsPDF library. Generating sample...');
-        // In production, use jsPDF to create proper PDF
+        const doc = new jsPDF();
+        let y = 20;
+
+        // Title
+        doc.setFontSize(20);
+        doc.text(`Design Specification: ${variant.displayName}`, 20, y);
+        y += 15;
+
+        // Intent Summary
+        doc.setFontSize(14);
+        doc.text('Design Intent', 20, y);
+        y += 10;
+        doc.setFontSize(10);
+        const intentLines = [
+            `Material: ${intent?.material.name || 'N/A'}`,
+            `Process: ${intent?.constraints.manufacturing || 'N/A'}`,
+            `Mass: ${variant.cadSnapshot.massProperties.mass.toFixed(1)}g`,
+            `Wall Thickness: ${variant.wallThickness}mm`
+        ];
+        doc.text(intentLines, 25, y);
+        y += 25;
+
+        // Analysis
+        doc.setFontSize(14);
+        doc.text('Analysis Results', 20, y);
+        y += 10;
+        doc.setFontSize(10);
+        doc.text(`Risk Level: ${variant.aiReasoning.overallRiskLevel.toUpperCase()}`, 25, y);
+        y += 6;
+        doc.text(`Rule Compliance: ${variant.ruleResults.score}%`, 25, y);
+        y += 6;
+        doc.text(`AI Summary:`, 25, y);
+        y += 6;
+        const summaryLines = doc.splitTextToSize(variant.aiReasoning.summary, 160);
+        doc.text(summaryLines, 25, y);
+        y += summaryLines.length * 5 + 10;
+
+        // Guidance
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setFontSize(14);
+        doc.text('Manufacturing Procedures', 20, y);
+        y += 10;
+        doc.setFontSize(10);
+
+        // We replicate simple procedural steps here for the report
+        const procedures = [
+            '1. Material Confirmation & Certs',
+            '2. Tolerances & GD&T Setup',
+            '3. CNC Setup & Tooling',
+            '4. Machining Operations (Face, Profile, Drill)',
+            '5. Surface Finishing & Deburring',
+            '6. Quality Inspection'
+        ];
+
+        procedures.forEach(step => {
+             doc.text(step, 25, y);
+             y += 6;
+        });
+
+        doc.save(`${variant.variantType}-report.pdf`);
     };
 
     const downloadFile = (content: string, filename: string, type: string) => {
@@ -833,325 +811,180 @@ function AuditTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> 
         URL.revokeObjectURL(url);
     };
 
-// AI Insights Tab - SRS F5 AI Reasoning & Insights
-function InsightsTab({ variant }: { variant: any }) {
-  const aiReasoning = useAppStore(state => state.aiReasoning);
-  const ruleCheckResult = useAppStore(state => state.ruleCheckResult);
-  const acceptSuggestion = useAppStore(state => state.acceptSuggestion);
-  const rejectSuggestion = useAppStore(state => state.rejectSuggestion);
- main
-
-  if (!aiReasoning && !ruleCheckResult) {
     return (
- feature/ai-design-enhancements-2705611776119386679
         <div className="export-tab">
             <div className="export-info">
                 <h3>📦 Audit & Export</h3>
                 <p>Export design data for compliance and manufacturing handover.</p>
+            </div>
 
-      <div className="empty-state">
-        <p>RUN ENGINE TO GENERATE AI INSIGHTS</p>
-        <p className="hint">AI will validate constraints, analyze trade-offs, and suggest optimizations</p>
-        <style jsx>{`
-          .empty-state { text-align: center; padding: 60px 20px; color: #444; }
-          .empty-state p { margin: 8px 0; font-size: 11px; }
-          .empty-state .hint { font-size: 9px; color: #222; }
-        `}</style>
-      </div>
+            <div className="export-options">
+                <button className="export-btn" onClick={handleExportJSON}>
+                    <span className="icon">📄</span>
+                    <div className="btn-content">
+                        <strong>Design Intent JSON</strong>
+                        <small>Parameters, constraints, analysis</small>
+                    </div>
+                </button>
+
+                <button className="export-btn" onClick={handleExportPDF}>
+                    <span className="icon">📑</span>
+                    <div className="btn-content">
+                        <strong>Procedure Notes PDF</strong>
+                        <small>Manufacturing steps, DFM notes</small>
+                    </div>
+                </button>
+
+                <button className="export-btn disabled">
+                    <span className="icon">🎨</span>
+                    <div className="btn-content">
+                        <strong>3D Model GLB</strong>
+                        <small>Coming soon</small>
+                    </div>
+                </button>
+            </div>
+
+            <div className="privacy-note">
+                🔒 All exports are generated locally. Your data never leaves your device.
+            </div>
+
+            <style jsx>{`
+        .export-tab {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .export-info h3 {
+          margin: 0 0 8px 0;
+          font-size: 14px;
+          color: #e0e0e0;
+        }
+
+        .export-info p {
+          margin: 0;
+          font-size: 12px;
+          color: #707070;
+        }
+
+        .export-options {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .export-btn {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: left;
+        }
+
+        .export-btn:hover:not(.disabled) {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(96, 165, 250, 0.5);
+        }
+
+        .export-btn.disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .export-btn .icon {
+          font-size: 24px;
+        }
+
+        .btn-content {
+          flex: 1;
+        }
+
+        .btn-content strong {
+          display: block;
+          font-size: 13px;
+          color: #e0e0e0;
+        }
+
+        .btn-content small {
+          font-size: 11px;
+          color: #707070;
+        }
+
+        .privacy-note {
+          padding: 12px;
+          background: rgba(16, 185, 129, 0.1);
+          border-radius: 8px;
+          font-size: 11px;
+          color: #10b981;
+          text-align: center;
+        }
+      `}</style>
+        </div>
     );
-  }
-
-  const { constraintViolations, suggestions, tradeoffs } = aiReasoning || { constraintViolations: [], suggestions: [], tradeoffs: { scenarios: [] } };
-
-  return (
-    <div className="insights-tab">
-      {/* SRS F4: Rule Engine Violations (BEFORE AI) */}
-      {ruleCheckResult && (ruleCheckResult.violations.length > 0 || ruleCheckResult.warnings.length > 0 || ruleCheckResult.info.length > 0) && (
-        <div className="section rule-violations">
-          <h3>🔒 RULE ENGINE (DETERMINISTIC CHECKS)</h3>
-
-          {ruleCheckResult.violations.map((v, i) => (
-            <div key={i} className="violation blocker">
-              <div className="v-header">
-                <span className="badge blocker">BLOCKER</span>
-                <span className="v-id">{v.ruleId}</span>
-              </div>
-              <div className="v-body">
-                <p className="clause">{v.title}</p>
-                <p className="comparison">
-                  Actual: <strong>{v.actualValue}</strong> {v.expectedValue && `| Expected: ≥ ${v.expectedValue}`}
-                </p>
-                <p className="rationale">{v.rationale}</p>
-                {v.citation && <p className="citation">Standard: {v.citation}</p>}
-              </div>
-main
-            </div>
-          ))}
-
-          {ruleCheckResult.warnings.map((v, i) => (
-            <div key={i} className="violation warn">
-              <div className="v-header">
-                <span className="badge warn">WARNING</span>
-                <span className="v-id">{v.ruleId}</span>
-              </div>
-              <div className="v-body">
-                <p className="clause">{v.title}</p>
-                <p className="rationale">{v.rationale}</p>
-                {v.citation && <p className="citation">Standard: {v.citation}</p>}
-              </div>
-            </div>
-          ))}
-
-          {ruleCheckResult.info.map((v, i) => (
-            <div key={i} className="violation info">
-              <div className="v-header">
-                <span className="badge info">INFO</span>
-                <span className="v-id">{v.ruleId}</span>
-              </div>
-              <div className="v-body">
-                <p className="clause">{v.title}</p>
-                <p className="rationale">{v.rationale}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Constraint Violations */}
-      {constraintViolations.length > 0 && (
-        <div className="section violations">
-          <h3>⚠ CONSTRAINT VIOLATIONS</h3>
-          {constraintViolations.map((v, i) => (
-            <div key={i} className={`violation ${v.severity}`}>
-              <div className="v-header">
-                <span className={`badge ${v.severity}`}>{v.severity.toUpperCase()}</span>
-                <span className="v-id">{v.constraintId}</span>
-              </div>
-              <div className="v-body">
-                <p className="clause">{v.intentClause}</p>
-                <p className="comparison">
-                  Actual: <strong>{v.actual}</strong> | Expected: <strong>{v.expected}</strong>
-                </p>
-                {v.suggestion && <p className="suggestion-hint">💡 {v.suggestion}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* AI Suggestions */}
-      {suggestions.length > 0 && (
-        <div className="section suggestions">
-          <h3>✓ AI-SUGGESTED OPTIMIZATIONS</h3>
-          {suggestions.map((sug, i) => (
-            <div key={sug.id} className="suggestion-card">
-              <div className="sug-header">
-                <span className="sug-number">{i + 1}</span>
-                <span className="sug-param">{sug.parameterKey}</span>
-                <span className="confidence">Confidence: {(sug.confidence * 100).toFixed(0)}%</span>
-              </div>
-
-              <div className="sug-change">
-                <span className="old-val">{sug.currentValue}</span>
-                <span className="arrow">→</span>
-                <span className="new-val">{sug.suggestedValue}</span>
-                <span className="delta">({sug.delta})</span>
-              </div>
-
-              <div className="sug-impact">
-                <strong>Impact:</strong>
-                {sug.impact.mass_delta_g && <span>Mass: {sug.impact.mass_delta_g > 0 ? '+' : ''}{sug.impact.mass_delta_g.toFixed(1)}g</span>}
-                {sug.impact.stiffness_delta_pct && <span>Stiffness: {sug.impact.stiffness_delta_pct.toFixed(1)}%</span>}
-                {sug.impact.safety_factor_delta && <span>S.F.: {sug.impact.safety_factor_delta > 0 ? '+' : ''}{sug.impact.safety_factor_delta.toFixed(2)}</span>}
-              </div>
-
-              <p className="sug-rationale">{sug.rationale}</p>
-              <p className="sug-link">Linked to: <code>{sug.linkedIntentClause}</code></p>
-
-              <div className="sug-actions">
-                <button className="accept-btn" onClick={() => acceptSuggestion(sug.id)}>ACCEPT</button>
-                <button className="reject-btn" onClick={() => rejectSuggestion(sug.id, 'User rejected')}>REJECT</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Trade-off Analysis */}
-      {tradeoffs.scenarios.length > 0 && (
-        <div className="section tradeoffs">
-          <h3>📊 TRADE-OFF ANALYSIS</h3>
-          <div className="scenario-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>SCENARIO</th>
-                  <th>MASS</th>
-                  <th>STIFF</th>
-                  <th>S.F.</th>
-                  <th>OPTIMAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tradeoffs.scenarios.map((sc, i) => (
-                  <tr key={i} className={sc.name === tradeoffs.recommendation ? 'recommended' : ''}>
-                    <td className="sc-name">{sc.name}</td>
-                    <td>{sc.metrics.mass_g.toFixed(0)}g</td>
-                    <td>{sc.metrics.stiffness_score.toFixed(0)}</td>
-                    <td>{sc.metrics.safety_factor.toFixed(2)}</td>
-                    <td>{sc.isParetoOptimal ? '✓' : ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="recommendation">
-            <strong>Recommended:</strong> {tradeoffs.recommendation}
-          </p>
-        </div>
-      )}
-
-      <style jsx>{`
-        .insights-tab { display: flex; flex-direction: column; gap: 20px; }
-        .section { border: 1px solid #1a1a1a; padding: 16px; background: #000; }
-        .section h3 { font-size: 11px; margin: 0 0 12px 0; letter-spacing: 1px; color: #fff; }
-        
-        /* Violations */
-        .violations .violation, .rule-violations .violation { margin-bottom: 12px; border-left: 3px solid #ff5555; padding-left: 12px; }
-        .violations .violation.warn, .rule-violations .violation.warn { border-left-color: #ffaa00; }
-        .violations .violation.info, .rule-violations .violation.info { border-left-color: #5599ff; }
-        .v-header { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-        .badge { font-size: 8px; padding: 2px 6px; font-weight: 800; color: #000; }
-        .badge.blocker { background: #ff5555; }
-        .badge.warn { background: #ffaa00; }
-        .badge.info { background: #5599ff; }
-        .v-id { font-size: 9px; color: #888; font-family: var(--font-mono); }
-        .v-body { font-size: 10px; }
-        .clause { color: #ccc; margin: 4px 0; }
-        .comparison { color: #888; margin: 4px 0; }
-        .comparison strong { color: #fff; }
-        .rationale { color: #999; margin: 4px 0; font-size: 9px; line-height: 1.4; }
-        .citation { color: #666; margin: 4px 0; font-size: 8px; font-style: italic; }
-        .suggestion-hint { color: #ffaa00; margin: 4px 0; }
-        
-        /* Suggestions */
-        .suggestions .suggestion-card { background: #050505; border: 1px solid #222; padding: 12px; margin-bottom: 12px; }
-        .sug-header { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-        .sug-number { background: #fff; color: #000; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
-        .sug-param { font-size: 10px; font-weight: 800; color: #fff; font-family: var(--font-mono); }
-        .confidence { margin-left: auto; font-size: 9px; color: #888; }
-        .sug-change { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 12px; font-family: var(--font-mono); }
-        .old-val { color: #888; }
-        .arrow { color: #666; }
-        .new-val { color: #fff; font-weight: 800; }
-        .delta { color: #5599ff; font-size: 10px; }
-        .sug-impact { display: flex; gap: 12px; font-size: 9px; color: #888; margin: 8px 0; flex-wrap: wrap; }
-        .sug-impact strong { color: #fff; margin-right: 8px; }
-        .sug-impact span { background: #111; padding: 2px 6px; }
-        .sug-rationale { font-size: 10px; color: #ccc; margin: 8px 0; }
-        .sug-link { font-size: 9px; color: #666; margin: 4px 0; }
-        .sug-link code { color: #888; background: #111; padding: 2px 4px; }
-        .sug-actions { display: flex; gap: 8px; margin-top: 12px; }
-        .accept-btn, .reject-btn { flex: 1; padding: 8px; font-size: 9px; font-weight: 800; cursor: pointer; border: 1px solid; }
-        .accept-btn { background: #fff; color: #000; border-color: #fff; }
-        .accept-btn:hover { background: #eee; }
-        .reject-btn { background: transparent; color: #888; border-color: #333; }
-        .reject-btn:hover { border-color: #666; color: #fff; }
-        
-        /* Trade-offs */
-        .scenario-table { overflow-x: auto; }
-        .scenario-table table { width: 100%; font-size: 10px; border-collapse: collapse; }
-        .scenario-table th { text-align: left; padding: 8px; color: #666; border-bottom: 1px solid #222; font-weight: 800; }
-        .scenario-table td { padding: 8px; color: #ccc; border-bottom: 1px solid #111; }
-        .scenario-table .sc-name { color: #fff; font-weight: 800; }
-        .scenario-table tr.recommended { background: rgba(255,255,255,0.05); }
-        .scenario-table tr.recommended .sc-name { color: #5599ff; }
-        .recommendation { font-size: 10px; color: #fff; margin-top: 12px; }
-        .recommendation strong { color: #5599ff; }
-      `}</style>
-    </div>
-  );
 }
 
-// Material Simulation Tab
-function SimulationTab() {
-  const results = useAppStore(state => state.simulationResults);
-  const intent = useAppStore(state => state.designIntent);
+// Simulation Tab (Placeholder)
+function SimulationTab({ variant }: { variant: ReturnType<typeof useSelectedVariant> }) {
+    if (!variant) return null;
 
-  if (!results.length) return <div className="empty">RUN ENGINE TO COMMENCE SIMULATION</div>;
+    return (
+        <div className="simulation-tab">
+            <div className="section">
+                <h3>🧪 Physics Simulation</h3>
+                <p>Finite Element Analysis (FEA) simulation modules are initializing.</p>
 
-  return (
-    <div className="simulation-tab">
-      <div className="sim-header">
-        <h3>PHYSICAL TRADE-OFF MATRIX</h3>
-        <p>Virtual linear-elastic simulation based on {intent?.part_id || 'Current Intent'}.</p>
-      </div>
+                <div className="placeholder-sim">
+                    <div className="sim-visual">
+                        <span className="sim-icon">🔄</span>
+                    </div>
+                    <p>Stress Analysis & Thermal Flow</p>
+                    <small>Coming in v1.1</small>
+                </div>
+            </div>
 
-      <div className="sim-table-wrapper">
-        <table className="sim-table">
-          <thead>
-            <tr>
-              <th>MATERIAL</th>
-              <th>MASS (G)</th>
-              <th>S.F.</th>
-              <th>DEFL (MM)</th>
-              <th>COST</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, i) => (
-              <tr key={i} className={r.safetyFactor < (intent?.acceptance.safety_factor_min || 0) ? 'fail' : ''}>
-                <td className="m-name">{r.materialName}</td>
-                <td>{r.mass_g}</td>
-                <td className="sf-val">{r.safetyFactor}</td>
-                <td>{r.deflection_mm}</td>
-                <td className="cost-stars">{"★".repeat(r.cost_score)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <style jsx>{`
-        .simulation-tab { display: flex; flex-direction: column; gap: 20px; }
-        .sim-header h3 { font-size: 11px; margin: 0 0 4px 0; letter-spacing: 1px; }
-        .sim-header p { font-size: 10px; color: #444; margin: 0; }
-
-        .sim-table-wrapper { border: 1px solid #1a1a1a; background: #000; }
-        .sim-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 10px; }
-        .sim-table th { text-align: left; padding: 10px 8px; color: #444; border-bottom: 1px solid #1a1a1a; font-weight: 800; }
-        .sim-table td { padding: 10px 8px; color: #fff; border-bottom: 1px solid #080808; }
-        
-        .m-name { color: #fff; font-weight: 800; }
-        .sf-val { font-weight: 800; }
-        .cost-stars { color: #444; font-size: 8px; }
-
-        .sim-table tr.fail td { background: rgba(255,0,0,0.05); }
-        .sim-table tr.fail .sf-val { color: #ff5555; }
-
-        .empty { color: #222; font-size: 10px; text-align: center; padding: 40px; }
-      `}</style>
-    </div>
-  );
-}
-
-// Audit Tab
-function AuditTab({ variant }: { variant: any }) {
-  return (
-    <div className="audit-tab">
-      <div className="section">
-        <h3>REVIEW STATUS</h3>
-        <p className="placeholder">Human-in-the-loop audit trail will appear here</p>
-        <p className="note">SRS F8: Review decisions, timestamps, and sign-off</p>
-      </div>
-
-      <style jsx>{`
-        .audit-tab { display: flex; flex-direction: column; gap: 20px; }
-        .section { border: 1px solid #1a1a1a; padding: 16px; background: #000; }
-        .section h3 { font-size: 11px; margin: 0 0 12px 0; letter-spacing: 1px; color: #666; }
-        .placeholder { font-size: 10px; color: #888; margin: 0 0 8px 0; }
-        .note { font-size: 9px; color: #444; margin: 0; }
-      `}</style>
-    </div>
-  );
+            <style jsx>{`
+                .simulation-tab {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+                .section h3 {
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #a0a0a0;
+                    margin: 0 0 12px 0;
+                }
+                .section p {
+                    font-size: 12px;
+                    color: #909090;
+                }
+                .placeholder-sim {
+                    margin-top: 20px;
+                    padding: 40px;
+                    background: rgba(0,0,0,0.2);
+                    border: 1px dashed rgba(255,255,255,0.1);
+                    border-radius: 12px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    text-align: center;
+                }
+                .sim-icon {
+                    font-size: 32px;
+                    margin-bottom: 12px;
+                    opacity: 0.5;
+                }
+                .placeholder-sim small {
+                    margin-top: 8px;
+                    color: #606060;
+                }
+            `}</style>
+        </div>
+    );
 }

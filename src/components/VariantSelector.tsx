@@ -1,122 +1,181 @@
 'use client';
 
-// Variant Selector v0.9 (SRS F5)
-// Selection between discrete guidance plans.
+// Variant Selector - Cards for selecting between generated variants
+// Shows key metrics: mass, cost, rigidity
 
-import { useAppStore } from '@/store/appStore';
+import { motion } from 'framer-motion';
+import { useAppStore, useVariants } from '@/store/appStore';
 
 export default function VariantSelector() {
-  const { variants, selectedVariantId, selectVariant } = useAppStore();
+    const variants = useVariants();
+    const { selectedVariantId, selectVariant } = useAppStore();
 
-  if (variants.length === 0) return null;
+    if (variants.length === 0) return null;
 
-  return (
-    <div className="variant-selector">
-      <div className="header-strip">
-        <h3>GUIDANCE PLANS</h3>
-        <span className="count">{variants.length} GENERATED</span>
-      </div>
+    const variantIcons: Record<string, string> = {
+        strength: '💪',
+        weight: '🪶',
+        cost: '💰',
+    };
 
-      <div className="card-row">
-        {variants.map((v) => (
-          <button
-            key={v.id}
-            className={`plan-card ${selectedVariantId === v.id ? 'active' : ''}`}
-            onClick={() => selectVariant(v.id)}
-          >
-            <div className="card-top">
-              <span className="plan-type">{v.variantType.toUpperCase()}</span>
-              <span className="risk">{v.insights.riskLevel === 'low' ? '✓' : '!'}</span>
+    const variantColors: Record<string, string> = {
+        strength: '#60a5fa',
+        weight: '#34d399',
+        cost: '#fbbf24',
+    };
+
+    return (
+        <div className="variant-selector">
+            <h3>Generated Variants</h3>
+            <div className="variant-cards">
+                {variants.map((variant, index) => (
+                    <motion.button
+                        key={variant.id}
+                        className={`variant-card ${selectedVariantId === variant.id ? 'selected' : ''}`}
+                        onClick={() => selectVariant(variant.id)}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        style={{
+                            '--accent-color': variantColors[variant.variantType],
+                        } as React.CSSProperties}
+                    >
+                        <div className="card-header">
+                            <span className="icon">{variantIcons[variant.variantType]}</span>
+                            <span className="type">{variant.variantType}</span>
+                        </div>
+
+                        <div className="card-metrics">
+                            <div className="metric">
+                                <span className="label">Mass</span>
+                                <span className="value">{variant.estimatedMass.toFixed(0)}g</span>
+                            </div>
+                            <div className="metric">
+                                <span className="label">Cost</span>
+                                <span className="value">{variant.costHeuristic}/10</span>
+                            </div>
+                            <div className="metric">
+                                <span className="label">Rigidity</span>
+                                <span className="value">{variant.rigidityScore}/10</span>
+                            </div>
+                        </div>
+
+                        <div className="card-params">
+                            <span>Wall: {variant.wallThickness}mm</span>
+                            <span>R: {variant.filletRadius}mm</span>
+                        </div>
+
+                        {!variant.ruleResults.overallPass && (
+                            <div className="violation-badge">⚠️ Issues</div>
+                        )}
+                    </motion.button>
+                ))}
             </div>
 
-            <div className="metrics">
-              <div className="m-item">
-                <span className="m-label">MASS</span>
-                <span className="m-val">{v.massG.toFixed(0)}g</span>
-              </div>
-              <div className="m-item">
-                <span className="m-label">COST</span>
-                <span className="m-val">{v.costScore}/10</span>
-              </div>
-            </div>
-
-            <div className="card-footer">
-              PARAM: {Object.keys(v.parameters).length}
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <style jsx>{`
+            <style jsx>{`
         .variant-selector {
-          padding: 12px 16px;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
+          padding: 16px 0;
         }
 
-        .header-strip {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+        .variant-selector h3 {
+          font-size: 12px;
+          font-weight: 600;
+          color: #808080;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin: 0 0 12px 0;
         }
 
-        h3 { font-size: 10px; color: #444; margin: 0; letter-spacing: 1px; }
-        .count { font-size: 9px; color: #222; }
-
-        .card-row {
+        .variant-cards {
           display: flex;
-          gap: 12px;
+          gap: 10px;
           overflow-x: auto;
-          overflow-y: hidden;
-          padding-bottom: 4px;
+          padding-bottom: 8px;
         }
 
-        .plan-card {
-          flex: 0 0 160px;
-          background: #000;
-          border: 1px solid #1a1a1a;
+        .variant-card {
+          flex: 0 0 auto;
+          width: 140px;
           padding: 12px;
-          text-align: left;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
           cursor: pointer;
+          transition: all 0.2s;
+          text-align: left;
+          position: relative;
         }
 
-        .plan-card:hover { border-color: #333; }
-        .plan-card.active { border-color: #fff; background: #080808; }
+        .variant-card:hover {
+          background: rgba(255, 255, 255, 0.06);
+        }
 
-        .card-top {
+        .variant-card.selected {
+          background: rgba(var(--accent-color-rgb, 96, 165, 250), 0.1);
+          border-color: var(--accent-color, #60a5fa);
+          box-shadow: 0 0 20px rgba(var(--accent-color-rgb, 96, 165, 250), 0.2);
+        }
+
+        .card-header {
           display: flex;
-          justify-content: space-between;
-          margin-bottom: 12px;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
         }
 
-        .plan-type { font-size: 10px; font-weight: 800; color: #fff; }
-        .risk { font-size: 10px; color: #444; }
+        .card-header .icon {
+          font-size: 18px;
+        }
 
-        .metrics {
+        .card-header .type {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--accent-color, #60a5fa);
+          text-transform: capitalize;
+        }
+
+        .card-metrics {
           display: flex;
           flex-direction: column;
           gap: 4px;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
         }
 
-        .m-item {
+        .metric {
           display: flex;
           justify-content: space-between;
-          font-size: 10px;
+          font-size: 11px;
         }
 
-        .m-label { color: #666; font-weight: 600; }
-        .m-val { color: #fff; font-family: var(--font-mono); }
+        .metric .label {
+          color: #606060;
+        }
 
-        .card-footer {
-          font-size: 8px;
-          color: #222;
-          font-family: var(--font-mono);
-          text-transform: uppercase;
+        .metric .value {
+          color: #c0c0c0;
+          font-weight: 500;
+        }
+
+        .card-params {
+          display: flex;
+          gap: 8px;
+          font-size: 10px;
+          color: #505050;
+        }
+
+        .violation-badge {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          padding: 2px 6px;
+          background: rgba(239, 68, 68, 0.2);
+          border-radius: 4px;
+          font-size: 10px;
+          color: #ef4444;
         }
       `}</style>
-    </div>
-  );
+        </div>
+    );
 }
