@@ -10,15 +10,15 @@ export class LBendGenerator extends BaseGenerator {
         const thickness = this.extractUnit(geo.thickness) || 2;
         const legA = this.extractUnit(geo.legA) || 50;
         const legB = this.extractUnit(geo.legB) || 50;
-        const bendAngle = this.extractUnit(geo.bendAngle) || 90;
-        const innerRadius = this.extractUnit(geo.innerBendRadius) || thickness * 1.5;
+        const bendAngleDeg = this.extractUnit(geo.bendAngle) || this.extractUnit(geo.angle) || 90;
+        const innerRadius = this.extractUnit(geo.innerBendRadius) || this.extractUnit(geo.bend_radius) || thickness;
 
         // Convert to meters for Three.js (mm → m * 0.01)
-        const t = thickness * 0.01;
-        const lA = legA * 0.01;
-        const lB = legB * 0.01;
-        const r = innerRadius * 0.01;
-        const angle = (bendAngle * Math.PI) / 180;
+        const t = thickness * 0.001;
+        const lA = legA * 0.001;
+        const lB = legB * 0.001;
+        const r = innerRadius * 0.001;
+        const angle = (bendAngleDeg * Math.PI) / 180;
 
         // Create combined geometry
         const geometry = this.createLBendMesh(lA, lB, t, r, angle);
@@ -31,12 +31,12 @@ export class LBendGenerator extends BaseGenerator {
         return {
             mesh: geometry,
             dimensions: {
-                length: legA / 100, // Convert back to meters for simulation
-                width: thickness / 100,
-                height: legB / 100
+                length: legA / 1000,
+                width: thickness / 1000,
+                height: legB / 1000
             },
             metadata: {
-                features: ['l-bend', `angle:${bendAngle}deg`]
+                features: ['l-bend', `angle:${bendAngleDeg}deg`]
             }
         };
     }
@@ -48,80 +48,82 @@ export class LBendGenerator extends BaseGenerator {
         bendRadius: number,
         bendAngle: number
     ): THREE.BufferGeometry {
-        const shapes: THREE.Vector3[] = [];
-        const segments = 16; // Smoothness of bend
+        // Since we can't easily rely on BufferGeometryUtils in this environment, 
+        // we will manually create and merge the geometries by transforming them 
+        // and merging attributes.
 
-        // LEG A - Flat horizontal section
-        // Bottom face vertices
-        shapes.push(new THREE.Vector3(0, 0, 0));
-        shapes.push(new THREE.Vector3(legA, 0, 0));
-        shapes.push(new THREE.Vector3(legA, 0, thickness));
-        shapes.push(new THREE.Vector3(0, 0, thickness));
-
-        // Create extruded box for Leg A
+        // 1. LEG A (Flat Horizontal)
         const legAGeom = new THREE.BoxGeometry(legA, thickness, thickness);
-        legAGeom.translate(legA / 2, 0, thickness / 2);
+        legAGeom.translate(legA / 2, 0, 0); // Origin at start
 
-        // BEND REGION - Curved transition
-        const bendGeom = this.createBendSection(bendRadius, thickness, bendAngle, segments);
-        bendGeom.translate(legA, 0, 0);
-
-        // LEG B - Vertical section (rotated)
+        // 2. LEG B (Vertical/Angled)
         const legBGeom = new THREE.BoxGeometry(legB, thickness, thickness);
+
+        // Position Leg B relative to end of bend
+        // Bend arc length = radius * angle
+        // But for visual simplicity, we position it at the end of the idealized bend
+
+        // Effective bend offset
+        const bendOffsetX = (bendRadius + thickness) * Math.sin(bendAngle);
+        const bendOffsetY = (bendRadius + thickness) * (1 - Math.cos(bendAngle));
+
         legBGeom.rotateZ(bendAngle);
-
-        // Position leg B at end of bend
-        const bendEndX = legA + bendRadius * Math.sin(bendAngle);
-        const bendEndY = bendRadius * (1 - Math.cos(bendAngle));
         legBGeom.translate(
-            bendEndX + (legB / 2) * Math.cos(bendAngle),
-            bendEndY + (legB / 2) * Math.sin(bendAngle),
-            thickness / 2
-        );
-
-        // Merge all geometries
-        const mergedGeometry = new THREE.BufferGeometry();
-        mergedGeometry.setAttribute('position', legAGeom.getAttribute('position'));
-        mergedGeometry.setIndex(legAGeom.getIndex());
-
-        // For now, return leg A geometry (bend merging requires BufferGeometryUtils)
-        // TODO: Properly merge bend and leg B
-        return legAGeom;
-    }
-
-    private createBendSection(
-        radius: number,
-        thickness: number,
-        angle: number,
-        segments: number
-    ): THREE.BufferGeometry {
-        // Create curved tube for bend
-        const curve = new THREE.EllipseCurve(
-            0, 0,
-            radius, radius,
-            0, angle,
-            false,
+            legA + bendOffsetX + (legB / 2) * Math.cos(bendAngle),
+            bendOffsetY + (legB / 2) * Math.sin(bendAngle),
             0
         );
 
-        const points = curve.getPoints(segments);
-        const path = new THREE.CatmullRomCurve3(
-            points.map(p => new THREE.Vector3(p.x, p.y, 0))
-        );
+        // 3. MERGE (Simple concatenation of attributes)
+        // Note: Real merging usually requires re-indexing, but for visual mesh 
+        // non-indexed merging is safer if we don't use BufferGeometryUtils
 
-        const shape = new THREE.Shape();
-        shape.moveTo(-thickness / 2, -thickness / 2);
-        shape.lineTo(thickness / 2, -thickness / 2);
-        shape.lineTo(thickness / 2, thickness / 2);
-        shape.lineTo(-thickness / 2, thickness / 2);
-        shape.closePath();
+        const mergedGeometry = new THREE.BufferGeometry();
 
-        const extrudeSettings = {
-            steps: segments,
-            bevelEnabled: false,
-            extrudePath: path
+        // Helper to get non-indexed attributes
+        const toNonIndexed = (geo: THREE.BufferGeometry) => {
+            return geo.index ? geo.toNonIndexed() : geo;
         };
 
-        return new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        const g1 = toNonIndexed(legAGeom);
+        const g2 = toNonIndexed(legBGeom);
+
+        const pos1 = g1.getAttribute('position').array;
+        const pos2 = g2.getAttribute('position').array;
+
+        const combinedPos = new Float32Array(pos1.length + pos2.length);
+        combinedPos.set(pos1);
+        combinedPos.set(pos2, pos1.length);
+
+        const norm1 = g1.getAttribute('normal').array;
+        const norm2 = g2.getAttribute('normal').array;
+
+        const combinedNorm = new Float32Array(norm1.length + norm2.length);
+        combinedNorm.set(norm1);
+        combinedNorm.set(norm2, norm1.length);
+
+        const uv1 = g1.getAttribute('uv').array;
+        const uv2 = g2.getAttribute('uv').array;
+
+        const combinedUV = new Float32Array(uv1.length + uv2.length);
+        combinedUV.set(uv1);
+        combinedUV.set(uv2, uv1.length);
+
+        mergedGeometry.setAttribute('position', new THREE.BufferAttribute(combinedPos, 3));
+        mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(combinedNorm, 3));
+        mergedGeometry.setAttribute('uv', new THREE.BufferAttribute(combinedUV, 2));
+
+        // Center entire geometry
+        mergedGeometry.computeBoundingBox();
+        mergedGeometry.center();
+
+        return mergedGeometry;
+    }
+
+    // Helper for units
+    protected extractUnit(val: any): number {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'object' && val.value) return val.value;
+        return 0;
     }
 }

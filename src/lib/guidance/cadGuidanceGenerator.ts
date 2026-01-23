@@ -13,10 +13,17 @@ export function generateCADSteps(intent: DesignIntent, variant: GeneratedVariant
     const steps: CADStep[] = [];
     let stepCount = 1;
 
-    const { L, W, H } = intent.envelope;
-    const { wallThickness, filletRadius, pocketDepth } = variant;
-    const holeCount = intent.features.mountingHoles?.count || 0;
-    const holeThread = intent.features.mountingHoles?.thread || 'M4';
+    // Extract dimensions from parameters
+    const L = parseFloat(intent.parameters['length_mm']?.toString() || '100');
+    const W = parseFloat(intent.parameters['width_mm']?.toString() || '100');
+    const H = parseFloat(intent.parameters['height_mm']?.toString() || intent.parameters['thickness_mm']?.toString() || '20');
+
+    // Extract variant parameters with fallbacks
+    const wallThickness = parseFloat(variant.parameters['wall_thickness_mm']?.toString() || variant.parameters['thickness_mm']?.toString() || '10');
+    const filletRadius = parseFloat(variant.parameters['fillet_radius']?.toString() || '2');
+    const pocketDepth = parseFloat(variant.parameters['pocket_depth']?.toString() || '0');
+    const holeCount = parseInt(intent.parameters['hole_count']?.toString() || '0');
+    const holeThread = intent.parameters['thread']?.toString() || 'M4';
 
     // 1. Base Setup
     steps.push({
@@ -56,7 +63,7 @@ export function generateCADSteps(intent: DesignIntent, variant: GeneratedVariant
 
     // 4. Mounting Holes
     if (holeCount > 0) {
-        const offset = intent.features.mountingHoles?.edgeOffset || 10;
+        const offset = parseFloat(intent.parameters['hole_edge_offset']?.toString() || '10');
         steps.push({
             stepNumber: stepCount++,
             action: 'Hole Wizard',
@@ -67,7 +74,10 @@ export function generateCADSteps(intent: DesignIntent, variant: GeneratedVariant
     }
 
     // 5. Fillets / Chamfers
-    if (variant.edgeStyle === 'fillet' && filletRadius > 0) {
+    const surfaceFinish = intent.parameters['surface_finish']?.toString() || '';
+    const chamferSize = parseFloat(intent.parameters['chamfer_size']?.toString() || '0');
+
+    if (filletRadius > 0 && chamferSize === 0) {
         steps.push({
             stepNumber: stepCount++,
             action: 'Apply Fillets',
@@ -75,21 +85,23 @@ export function generateCADSteps(intent: DesignIntent, variant: GeneratedVariant
             parameters: { Radius: filletRadius },
             toolIcon: '╭'
         });
-    } else if (variant.edgeStyle === 'chamfer') {
+    } else if (chamferSize > 0) {
         steps.push({
             stepNumber: stepCount++,
             action: 'Apply Chamfers',
-            description: `Select vertical edges. Apply chamfer of 1mm x 45°.`,
+            description: `Select vertical edges. Apply chamfer of ${chamferSize}mm x 45°.`,
+            parameters: { Size: chamferSize },
             toolIcon: '◣'
         });
     }
 
     // 6. Material Assignment
+    const materialName = intent.materials[0] || 'Aluminum 6061-T6';
     steps.push({
         stepNumber: stepCount++,
         action: 'Assign Material',
-        description: `Right-click Material in FeatureManager. Select "${intent.material.name}".`,
-        parameters: { Material: intent.material.name },
+        description: `Right-click Material in FeatureManager. Select "${materialName}".`,
+        parameters: { Material: materialName },
         toolIcon: '🧱'
     });
 
@@ -97,8 +109,8 @@ export function generateCADSteps(intent: DesignIntent, variant: GeneratedVariant
     steps.push({
         stepNumber: stepCount++,
         action: 'Mass Properties',
-        description: `Check Mass Properties. Verify mass is approx ${variant.estimatedMass.toFixed(1)}g.`,
-        parameters: { 'Target Mass': `${variant.estimatedMass.toFixed(1)}g` },
+        description: `Check Mass Properties. Verify mass is approx ${variant.massG}g.`,
+        parameters: { 'Target Mass': `${Math.round(variant.massG)}g` },
         toolIcon: '⚖️'
     });
 

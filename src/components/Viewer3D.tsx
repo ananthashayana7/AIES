@@ -4,7 +4,7 @@
 // High-contrast technical visualization environment.
 
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Html, Grid } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Html, Grid, Environment, ContactShadows } from '@react-three/drei';
 import { Suspense, useState } from 'react';
 import { useSelectedVariant, useAppStore } from '@/store/appStore';
 import ParametricMesh from './ParametricMesh';
@@ -14,92 +14,6 @@ interface InspectData {
     visible: boolean;
     region: string;
     specs: { label: string; value: string }[];
-}
-
-// Coordinate Axes and Part Dimension Annotations
-function CoordinateAxes({ partDimensions }: { partDimensions?: { length: number; width: number; height: number } }) {
-    const arrowLength = 0.8;
-
-    // Default dimensions if not provided
-    const dims = partDimensions || { length: 2, width: 2, height: 0.2 };
-
-    return (
-        <>
-            {/* Simple Axes at Origin */}
-            <group position={[0, 0, 0]}>
-                <arrowHelper args={[new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), arrowLength, 0xff0000, 0.1, 0.08]} />
-                <Html position={[arrowLength + 0.15, 0, 0]} center>
-                    <span style={{ color: '#ff0000', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: '800' }}>X</span>
-                </Html>
-
-                <arrowHelper args={[new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), arrowLength, 0x00ff00, 0.1, 0.08]} />
-                <Html position={[0, arrowLength + 0.15, 0]} center>
-                    <span style={{ color: '#00ff00', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: '800' }}>Y</span>
-                </Html>
-
-                <arrowHelper args={[new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), arrowLength, 0x0000ff, 0.1, 0.08]} />
-                <Html position={[0, 0, arrowLength + 0.15]} center>
-                    <span style={{ color: '#0000ff', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: '800' }}>Z</span>
-                </Html>
-            </group>
-
-            {/* Part Dimension Annotations */}
-            {partDimensions && (
-                <group>
-                    {/* Length dimension (X-axis) */}
-                    <Html position={[dims.length / 2, -0.3, dims.width / 2 + 0.3]} center>
-                        <div style={{
-                            color: '#ffffff',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: 'rgba(0,0,0,0.7)',
-                            padding: '4px 8px',
-                            border: '1px solid #ff0000',
-                            borderRadius: '2px',
-                            whiteSpace: 'nowrap'
-                        }}>
-                            L: {(dims.length * 100).toFixed(0)}mm
-                        </div>
-                    </Html>
-
-                    {/* Width dimension (Z-axis) */}
-                    <Html position={[dims.length + 0.3, -0.3, dims.width / 2]} center>
-                        <div style={{
-                            color: '#ffffff',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: 'rgba(0,0,0,0.7)',
-                            padding: '4px 8px',
-                            border: '1px solid #0000ff',
-                            borderRadius: '2px',
-                            whiteSpace: 'nowrap'
-                        }}>
-                            W: {(dims.width * 100).toFixed(0)}mm
-                        </div>
-                    </Html>
-
-                    {/* Height dimension (Y-axis) */}
-                    <Html position={[dims.length + 0.3, dims.height / 2, -0.3]} center>
-                        <div style={{
-                            color: '#ffffff',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: 'rgba(0,0,0,0.7)',
-                            padding: '4px 8px',
-                            border: '1px solid #00ff00',
-                            borderRadius: '2px',
-                            whiteSpace: 'nowrap'
-                        }}>
-                            H: {(dims.height * 100).toFixed(0)}mm
-                        </div>
-                    </Html>
-                </group>
-            )}
-        </>
-    );
 }
 
 function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (data: InspectData) => void }) {
@@ -134,14 +48,8 @@ function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (d
         );
     }
 
-    // Extract part dimensions from variant parameters
-    const length = parseFloat(variant.parameters['length_mm']?.toString() || '100') * 0.01;
-    const width = parseFloat(variant.parameters['width_mm']?.toString() || '100') * 0.01;
-    const height = parseFloat(variant.parameters['height_mm']?.toString() || variant.parameters['thickness_mm']?.toString() || '20') * 0.01;
-
     return (
         <>
-            <CoordinateAxes partDimensions={{ length, width, height }} />
             <ParametricMesh
                 variant={variant}
                 intent={intent}
@@ -168,40 +76,57 @@ export default function Viewer3D() {
                 {/* Enhanced OrbitControls for better navigation */}
                 <OrbitControls
                     enableDamping
-                    dampingFactor={0.05}
+                    dampingFactor={0.07}
                     rotateSpeed={0.8}
-                    zoomSpeed={1.2}
+                    zoomSpeed={1.0}
                     panSpeed={0.8}
                     minDistance={0.5}
-                    maxDistance={10}
+                    maxDistance={8}
                     minPolarAngle={0}
-                    maxPolarAngle={Math.PI}
+                    maxPolarAngle={Math.PI / 1.8}
+                    makeDefault
                 />
 
-                {/* Lighting */}
+                {/* ===== PREMIUM STUDIO LIGHTING (LOCAL FALLBACK) ===== */}
+                {/* ===== PREMIUM STUDIO LIGHTING (LOCAL) ===== */}
                 <ambientLight intensity={0.4} />
-                <directionalLight
-                    position={[5, 5, 5]}
-                    intensity={0.8}
+                <spotLight
+                    position={[10, 10, 10]}
+                    angle={0.2}
+                    penumbra={1}
+                    intensity={2}
                     castShadow
-                    shadow-mapSize-width={2048}
-                    shadow-mapSize-height={2048}
+                    shadow-mapSize={[2048, 2048]}
                 />
-                <directionalLight position={[-5, 3, -5]} intensity={0.3} />
-                <pointLight position={[0, 3, 0]} intensity={0.3} />
+                <directionalLight position={[-5, 5, 5]} intensity={1} />
+                <pointLight position={[5, -5, -5]} intensity={0.5} color="#445" />
+                <pointLight position={[0, 10, 0]} intensity={0.5} />
 
-                {/* Grid */}
+
+                {/* ===== VISUAL GROUNDING ===== */}
+                <ContactShadows
+                    position={[0, 0, 0]}
+                    opacity={0.4}
+                    scale={10}
+                    blur={2.5}
+                    far={4}
+                    resolution={512}
+                    color="#000000"
+                />
+
+                {/* Polished Scene Grid */}
                 <Grid
-                    args={[20, 20]}
-                    cellSize={0.5}
+                    args={[15, 15]}
+                    cellSize={0.1}
                     cellThickness={0.5}
                     cellColor="#1a1a1a"
-                    sectionSize={1}
+                    sectionSize={0.5}
                     sectionThickness={1}
                     sectionColor="#2a2a2a"
-                    fadeDistance={15}
+                    fadeDistance={10}
                     fadeStrength={1}
-                    position={[0, -0.01, 0]}
+                    position={[0, -0.001, 0]}
+                    infiniteGrid
                 />
 
                 <Suspense fallback={null}>

@@ -3,35 +3,22 @@
 // Advanced Design Intent Editor v0.9+ 
 // Supports high-complexity parameter systems & multi-scenario modeling.
 
- feature/ai-design-enhancements-2705611776119386679
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useAppStore } from '@/store/appStore';
-import { DesignIntent } from '@/lib/schemas/designIntent';
-import { v4 as uuidv4 } from 'uuid';
-
-interface ParameterRow {
-  id: string;
-  name: string;
-  value: string;
-  unit: string;
-}
-
-// Common units for autocomplete
-const commonUnits = ['mm', 'cm', 'm', 'in', 'μm', 'deg', '°', 'qty', 'g', 'kg', 'N', 'MPa', '%'];
-
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { DesignIntent, IntentConstraint } from '@/lib/schemas/designIntent';
-main
 
 import { MATERIAL_LIBRARY } from '@/lib/simulation/materialLibrary';
 
+import SpecInputForm from './SpecInputForm';
+
 export default function SpecInput() {
-  const { setDesignIntent, generateGuidance, isProcessing, designIntent } = useAppStore();
-  const [bulkMode, setBulkMode] = useState(false);
+  const { setDesignIntent, generateGuidance, isProcessing: storeProcessing, designIntent } = useAppStore();
+  const [activeTab, setActiveTab] = useState<'structured' | 'json' | 'wizard'>('structured');
   const [bulkText, setBulkText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const [localIntent, setLocalIntent] = useState<DesignIntent>(designIntent || {
+    // ... default init
     part_id: 'CPLX-001',
     revision: 'A.0',
     materials: ['Aluminum 6061-T6'],
@@ -54,10 +41,12 @@ export default function SpecInput() {
     }
   });
 
-  // Keep local intent in sync if store changes (e.g. example load)
+  // Keep local intent in sync
   useEffect(() => {
     if (designIntent) setLocalIntent(designIntent);
   }, [designIntent]);
+
+  // ... (toggleMaterial, updateParam, removeParam, addParam, setConstraint, normalizeIntent helpers remain same) 
 
   const toggleMaterial = (name: string) => {
     const mats = [...localIntent.materials];
@@ -67,7 +56,6 @@ export default function SpecInput() {
       if (mats.length > 1) {
         newMats = mats.filter(m => m !== name);
       } else {
-        // Don't allow removing the last material
         return;
       }
     } else {
@@ -77,7 +65,6 @@ export default function SpecInput() {
     const updatedIntent = { ...localIntent, materials: newMats };
     setLocalIntent(updatedIntent);
 
-    // Auto-apply material changes to trigger re-simulation
     setTimeout(() => {
       setDesignIntent(updatedIntent);
       generateGuidance();
@@ -86,9 +73,7 @@ export default function SpecInput() {
 
   const updateParam = (oldKey: string, newKey: string, value: any) => {
     const newParams = { ...localIntent.parameters };
-    if (oldKey !== newKey) {
-      delete newParams[oldKey];
-    }
+    if (oldKey !== newKey) delete newParams[oldKey];
     newParams[newKey] = value;
     setLocalIntent({ ...localIntent, parameters: newParams });
   };
@@ -111,6 +96,7 @@ export default function SpecInput() {
   };
 
   const normalizeIntent = (obj: any): DesignIntent => {
+    // ... same normalize logic
     const base: DesignIntent = {
       part_id: obj.part_id || obj.product || 'CUSTOM-001',
       revision: obj.revision || 'A.0',
@@ -121,12 +107,10 @@ export default function SpecInput() {
       acceptance: obj.acceptance || { max_mass_g: 5000, safety_factor_min: 3.0 }
     };
 
-    // If it's a "Loose" JSON (user pasted arbitrary fields), map them to parameters
     Object.keys(obj).forEach(key => {
       const reserved = ['part_id', 'revision', 'materials', 'parameters', 'constraints', 'objectives', 'acceptance', 'guidance_steps'];
       if (!reserved.includes(key)) {
         if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-          // Flatten nested objects like "dimensions"
           Object.entries(obj[key]).forEach(([subK, subV]) => {
             base.parameters[`${key}.${subK}`] = subV as any;
           });
@@ -150,25 +134,49 @@ export default function SpecInput() {
       const parsed = JSON.parse(val);
       const normalized = normalizeIntent(parsed);
       setLocalIntent(normalized);
-    } catch (e) {
-      // Allow invalid JSON during typing, don't update localIntent
-    }
+    } catch (e) { }
   };
 
-  const enterBulkMode = () => {
-    setBulkText(JSON.stringify(localIntent, null, 2));
-    setBulkMode(true);
+  // API Call integration
+  const handleWizardSubmit = async (spec: string) => {
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spec })
+      });
+      const data = await res.json();
+
+      if (data.designIntent) {
+        setLocalIntent(data.designIntent);
+        setDesignIntent(data.designIntent); // Auto-apply
+        generateGuidance();
+        setActiveTab('structured');
+      }
+    } catch (e) {
+      console.error("Failed to generate", e);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
     <div className="intent-editor">
       <div className="tab-header">
-        <button className={!bulkMode ? 'active' : ''} onClick={() => setBulkMode(false)}>STRUCTURED</button>
-        <button className={bulkMode ? 'active' : ''} onClick={enterBulkMode}>BULK JSON</button>
+        <button className={activeTab === 'structured' ? 'active' : ''} onClick={() => setActiveTab('structured')}>STRUCTURED</button>
+        <button className={activeTab === 'json' ? 'active' : ''} onClick={() => { setBulkText(JSON.stringify(localIntent, null, 2)); setActiveTab('json'); }}>JSON</button>
+        <button className={activeTab === 'wizard' ? 'active' : ''} onClick={() => setActiveTab('wizard')}>WIZARD</button>
       </div>
 
       <div className="scroll-area">
-        {!bulkMode ? (
+        {activeTab === 'wizard' && (
+          <div className="p-4">
+            <SpecInputForm onSubmit={handleWizardSubmit} isLoading={isGenerating} />
+          </div>
+        )}
+
+        {activeTab === 'structured' && (
           <>
             <div className="section">
               <div className="meta-row">
@@ -224,7 +232,7 @@ export default function SpecInput() {
                     />
                     <input
                       className="v-input"
-                      value={val}
+                      value={val ?? ''}
                       onChange={e => updateParam(key, key, e.target.value)}
                     />
                     <button className="del-btn" onClick={() => removeParam(key)}>×</button>
@@ -271,7 +279,9 @@ export default function SpecInput() {
               </div>
             </div>
           </>
-        ) : (
+        )}
+
+        {activeTab === 'json' && (
           <div className="json-area">
             <textarea
               value={bulkText}
@@ -287,9 +297,9 @@ export default function SpecInput() {
         <button
           className="apply-btn"
           onClick={handleApply}
-          disabled={isProcessing}
+          disabled={storeProcessing || isGenerating}
         >
-          {isProcessing ? 'MODELING SCENARIO...' : 'EXECUTE GUIDANCE ENGINE'}
+          {isGenerating ? 'PARSING INTENT...' : (storeProcessing ? 'MODELING SCENARIO...' : 'EXECUTE GUIDANCE ENGINE')}
         </button>
       </div>
 

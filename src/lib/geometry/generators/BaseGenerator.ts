@@ -9,18 +9,27 @@ export interface GeometrySpec {
 }
 
 export interface GeneratedGeometry {
-    mesh: THREE.BufferGeometry;
+    mesh: THREE.BufferGeometry | THREE.Object3D;
     dimensions: {
-        length: number;
-        width: number;
-        height: number;
+        length?: number;
+        width?: number;
+        height?: number;
+        radius?: number;
+        diameter?: number;
+        outerDiameter?: number;
+        pitchDiameter?: number;
+        thickness?: number;
+        [key: string]: number | undefined;
     };
     metadata?: {
         volume_mm3?: number;
         surfaceArea_mm2?: number;
+        mass_g?: number;
         features?: string[];
+        [key: string]: any;
     };
 }
+
 
 export abstract class BaseGenerator {
     abstract generate(spec: GeometrySpec): GeneratedGeometry;

@@ -20,8 +20,8 @@
 
   --shadow-sm: none;
 
-  --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
 }
 
 * {

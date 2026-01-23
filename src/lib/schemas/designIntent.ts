@@ -1,6 +1,9 @@
 // Design Intent Schema v0.9 (Aligned with SRS 5.1)
 // This is the source of truth for AI reasoning and design guidance.
 
+export type VariantType = 'strength' | 'weight' | 'cost' | 'balanced' | 'compact';
+
+
 export interface IntentConstraint {
     id: string;
     type: 'bound' | 'tolerance' | 'interface';

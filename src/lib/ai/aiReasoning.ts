@@ -4,7 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DesignIntent, VariantType } from '../schemas/designIntent';
 import { CADSnapshot } from '../schemas/cadSnapshot';
-import { RuleEngineResults } from '../rules/ruleEngine';
+import { RuleCheckResult } from '../rules/ruleEngine';
 
 export interface ConstraintViolation {
     constraintName: string;
@@ -62,7 +62,7 @@ export interface AIReasoningResult {
 export function performAIReasoning(
     intent: DesignIntent,
     snapshot: CADSnapshot,
-    ruleResults: RuleEngineResults,
+    ruleResults: RuleCheckResult,
     variantType: VariantType
 ): AIReasoningResult {
     // 1. Constraint Reasoning
@@ -71,7 +71,7 @@ export function performAIReasoning(
 
     // 2. Risk Assessment
     const riskScores = assessRisks(intent, snapshot, variantType);
-    const avgRisk = riskScores.reduce((sum, r) => sum + r.score, 0) / riskScores.length;
+    const avgRisk = riskScores.reduce((sum, r) => sum + r.score, 0) / (riskScores.length || 1);
     const overallRiskLevel = avgRisk > 60 ? 'high' : avgRisk > 30 ? 'medium' : 'low';
 
     // 3. Trade-off Analysis
@@ -98,24 +98,27 @@ export function performAIReasoning(
 function analyzeConstraints(intent: DesignIntent, snapshot: CADSnapshot): ConstraintViolation[] {
     const violations: ConstraintViolation[] = [];
 
-    // Mass constraint
-    if (snapshot.massProperties.mass > intent.constraints.maxMassG) {
-        const overBy = snapshot.massProperties.mass - intent.constraints.maxMassG;
+    // Mass constraint - using acceptance.max_mass_g
+    const maxMass = intent.acceptance?.max_mass_g || 5000;
+    if (snapshot.massProperties?.mass && snapshot.massProperties.mass > maxMass) {
+        const overBy = snapshot.massProperties.mass - maxMass;
         violations.push({
             constraintName: 'Maximum Mass',
-            intentValue: `≤ ${intent.constraints.maxMassG}g`,
+            intentValue: `≤ ${maxMass}g`,
             actualValue: `${snapshot.massProperties.mass.toFixed(1)}g`,
             impact: overBy > 50 ? 'critical' : overBy > 20 ? 'moderate' : 'minor',
             explanation: `Design exceeds mass limit by ${overBy.toFixed(1)}g. This may affect mounting, handling, or system weight budgets.`,
         });
     }
 
-    // Wall thickness
-    if (snapshot.parameters.wallThickness < intent.constraints.minWall) {
+    // Wall thickness - using parameters
+    const minWall = parseFloat(intent.parameters['min_wall_mm']?.toString() || '2');
+    const actualWall = snapshot.parameters?.wallThickness || parseFloat(intent.parameters['thickness_mm']?.toString() || '10');
+    if (actualWall < minWall) {
         violations.push({
             constraintName: 'Minimum Wall Thickness',
-            intentValue: `≥ ${intent.constraints.minWall}mm`,
-            actualValue: `${snapshot.parameters.wallThickness}mm`,
+            intentValue: `≥ ${minWall}mm`,
+            actualValue: `${actualWall}mm`,
             impact: 'critical',
             explanation: 'Wall thickness below minimum compromises structural integrity and manufacturability.',
         });
@@ -144,16 +147,17 @@ function assessRisks(
     risks.push({
         category: 'Manufacturing Issues',
         score: mfgRisk,
-        factors: getManufacturingFactors(intent, snapshot),
+        factors: getManufacturingFactors(intent),
     });
 
     // Tolerance stack-up risk
-    if (intent.features.mountingHoles) {
-        const toleranceRisk = snapshot.featureCount.holes > 4 ? 45 : 20;
+    const holeCount = parseFloat(intent.parameters['hole_count']?.toString() || '0');
+    if (holeCount > 0) {
+        const toleranceRisk = holeCount > 4 ? 45 : 20;
         risks.push({
             category: 'Tolerance Stack-up',
             score: toleranceRisk,
-            factors: [`${snapshot.featureCount.holes} holes require careful tolerance management`],
+            factors: [`${holeCount} holes require careful tolerance management`],
         });
     }
 
@@ -167,7 +171,8 @@ function calculateStructuralRisk(snapshot: CADSnapshot, variantType: VariantType
         risk += 25; // Thinner walls = higher risk
     }
 
-    if (snapshot.parameters.wallThickness < 2.5) {
+    const wallThickness = snapshot.parameters?.wallThickness || 10;
+    if (wallThickness < 2.5) {
         risk += 20;
     }
 
@@ -185,10 +190,11 @@ function getStructuralFactors(snapshot: CADSnapshot, variantType: VariantType): 
     if (variantType === 'weight') {
         factors.push('Weight-optimized design has reduced material');
     }
-    if (snapshot.parameters.wallThickness < 2.5) {
-        factors.push(`Wall thickness ${snapshot.parameters.wallThickness}mm is relatively thin`);
+    const wallThickness = snapshot.parameters?.wallThickness || 10;
+    if (wallThickness < 2.5) {
+        factors.push(`Wall thickness ${wallThickness}mm is relatively thin`);
     }
-    if (snapshot.featureCount.pockets > 0) {
+    if (snapshot.featureCount?.pockets && snapshot.featureCount.pockets > 0) {
         factors.push('Pockets reduce cross-sectional area');
     }
 
@@ -198,36 +204,39 @@ function getStructuralFactors(snapshot: CADSnapshot, variantType: VariantType): 
 function calculateManufacturingRisk(intent: DesignIntent, snapshot: CADSnapshot): number {
     let risk = 15;
 
-    if (intent.material.Ra && intent.material.Ra < 1.6) {
+    const surfaceFinish = intent.parameters['surface_finish']?.toString() || '';
+    if (surfaceFinish.includes('polished') || surfaceFinish.includes('mirror')) {
         risk += 20; // Fine finish required
     }
 
-    if (snapshot.featureCount.fillets > 4) {
+    const filletCount = snapshot.featureCount?.fillets || 0;
+    if (filletCount > 4) {
         risk += 10; // Multiple fillet operations
     }
 
-    if (snapshot.parameters.filletRadius < 1.0) {
+    const filletRadius = snapshot.parameters?.filletRadius || 2;
+    if (filletRadius < 1.0) {
         risk += 15; // Small tool radius needed
     }
 
     return Math.min(100, risk);
 }
 
-function getManufacturingFactors(intent: DesignIntent, snapshot: CADSnapshot): string[] {
+function getManufacturingFactors(intent: DesignIntent): string[] {
     const factors: string[] = [];
 
-    if (intent.material.Ra && intent.material.Ra < 1.6) {
+    const surfaceFinish = intent.parameters['surface_finish']?.toString() || '';
+    if (surfaceFinish.includes('polished') || surfaceFinish.includes('mirror')) {
         factors.push('Fine surface finish requires additional operations');
     }
-    if (snapshot.parameters.filletRadius < 1.0) {
-        factors.push('Small fillet radius needs specialty tooling');
-    }
-    factors.push(`${intent.constraints.manufacturing.replace('_', ' ')} process selected`);
+
+    const material = intent.materials[0] || 'Aluminum';
+    factors.push(`${material} machining process`);
 
     return factors;
 }
 
-function analyzeTradeOffs(variantType: VariantType, snapshot: CADSnapshot): TradeOff[] {
+function analyzeTradeOffs(variantType: VariantType, _snapshot: CADSnapshot): TradeOff[] {
     const tradeOffs: TradeOff[] = [];
 
     tradeOffs.push({
@@ -263,17 +272,20 @@ function generateSuggestions(
     intent: DesignIntent,
     snapshot: CADSnapshot,
     variantType: VariantType,
-    _ruleResults: RuleEngineResults
+    _ruleResults: RuleCheckResult
 ): ParameterSuggestion[] {
     const suggestions: ParameterSuggestion[] = [];
 
     // Suggest based on mass constraints
-    if (snapshot.massProperties.mass > intent.constraints.maxMassG * 0.9) {
+    const maxMass = intent.acceptance?.max_mass_g || 5000;
+    const currentMass = snapshot.massProperties?.mass || 0;
+    if (currentMass > maxMass * 0.9) {
+        const wallThickness = snapshot.parameters?.wallThickness || 10;
         suggestions.push({
             id: uuidv4(),
             parameter: 'wallThickness',
-            currentValue: snapshot.parameters.wallThickness,
-            suggestedValue: snapshot.parameters.wallThickness - 0.5,
+            currentValue: wallThickness,
+            suggestedValue: wallThickness - 0.5,
             delta: -0.5,
             rationale: 'Approaching mass limit',
             expectedImprovement: 'Reduce mass by approximately 10-15g',
@@ -281,13 +293,14 @@ function generateSuggestions(
     }
 
     // Suggest fillet optimization
-    if (variantType === 'strength' && snapshot.parameters.filletRadius < 4) {
+    const filletRadius = snapshot.parameters?.filletRadius || 2;
+    if (variantType === 'strength' && filletRadius < 4) {
         suggestions.push({
             id: uuidv4(),
             parameter: 'filletRadius',
-            currentValue: snapshot.parameters.filletRadius,
+            currentValue: filletRadius,
             suggestedValue: 6,
-            delta: 6 - snapshot.parameters.filletRadius,
+            delta: 6 - filletRadius,
             rationale: 'Larger fillets reduce stress concentration',
             expectedImprovement: 'Reduce peak stress by 10-20%',
         });
@@ -300,12 +313,14 @@ function generateSummary(
     variantType: VariantType,
     violations: ConstraintViolation[],
     risks: RiskScore[],
-    ruleResults: RuleEngineResults
+    ruleResults: RuleCheckResult
 ): string {
-    const variantDesc = {
+    const variantDesc: Record<VariantType, string> = {
         strength: 'Strength-Optimized',
         weight: 'Weight-Optimized',
         cost: 'Cost-Optimized',
+        balanced: 'Balanced',
+        compact: 'Compact',
     };
 
     let summary = `**${variantDesc[variantType]} Variant Analysis**\n\n`;
@@ -316,9 +331,9 @@ function generateSummary(
         summary += `⚠ ${violations.length} constraint violation(s) detected.\n`;
     }
 
-    const avgRisk = risks.reduce((sum, r) => sum + r.score, 0) / risks.length;
+    const avgRisk = risks.reduce((sum, r) => sum + r.score, 0) / (risks.length || 1);
     summary += `Risk Level: ${avgRisk > 60 ? 'High' : avgRisk > 30 ? 'Medium' : 'Low'} (${avgRisk.toFixed(0)}%)\n`;
-    summary += `Rule Compliance: ${ruleResults.score}%\n`;
+    summary += `Rule Compliance: ${ruleResults.allPassed ? '100' : Math.max(0, 100 - (ruleResults.violations?.length || 0) * 20)}%\n`;
 
     return summary;
 }
