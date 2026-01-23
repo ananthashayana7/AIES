@@ -10,6 +10,14 @@ import * as THREE from 'three';
 import { useSelectedVariant, useDesignIntent } from '@/store/appStore';
 import ParametricMesh from './ParametricMesh';
 
+export type ViewMode = 'standard' | 'wireframe' | 'xray';
+
+export interface ViewSettings {
+    mode: ViewMode;
+    showGrid: boolean;
+    showAxes: boolean;
+}
+
 function LoadingBox() {
     return (
         <mesh>
@@ -25,7 +33,15 @@ interface InspectData {
     specs: { label: string; value: string }[];
 }
 
-function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (data: InspectData) => void }) {
+function Scene({
+    inspectMode,
+    onInspect,
+    viewSettings
+}: {
+    inspectMode: boolean;
+    onInspect: (data: InspectData) => void;
+    viewSettings: ViewSettings;
+}) {
     const variant = useSelectedVariant();
     const intent = useDesignIntent();
 
@@ -107,6 +123,7 @@ function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (d
                 variant={variant}
                 intent={intent}
                 inspectMode={inspectMode}
+                viewSettings={viewSettings}
                 onClick={handleClick}
             />
             <ContactShadows
@@ -116,7 +133,12 @@ function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (d
                 blur={2.5}
                 color="#7c3aed"
             />
-            <gridHelper args={[10, 20, '#2a2a4a', '#1a1a2e']} position={[0, -0.5, 0]} />
+            {viewSettings.showGrid && (
+                <gridHelper args={[20, 40, '#2a2a4a', '#1a1a2e']} position={[0, -0.5, 0]} />
+            )}
+            {viewSettings.showAxes && (
+                <axesHelper args={[2]} position={[-5, -0.5, 5]} />
+            )}
         </>
     );
 }
@@ -124,6 +146,19 @@ function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (d
 export default function Viewer3D() {
     const [inspectMode, setInspectMode] = useState(false);
     const [inspectData, setInspectData] = useState<InspectData>({ visible: false, region: '', specs: [] });
+
+    // Workstation Settings
+    const [viewSettings, setViewSettings] = useState<ViewSettings>({
+        mode: 'standard',
+        showGrid: true,
+        showAxes: false,
+    });
+
+    const toggleViewMode = () => {
+        const modes: ViewMode[] = ['standard', 'wireframe', 'xray'];
+        const nextIndex = (modes.indexOf(viewSettings.mode) + 1) % modes.length;
+        setViewSettings({ ...viewSettings, mode: modes[nextIndex] });
+    };
 
     return (
         <div className="viewer-container">
@@ -141,7 +176,11 @@ export default function Viewer3D() {
                 <pointLight position={[8, 3, 8]} intensity={0.3} color="#06b6d4" />
 
                 <Suspense fallback={<LoadingBox />}>
-                    <Scene inspectMode={inspectMode} onInspect={setInspectData} />
+                    <Scene
+                        inspectMode={inspectMode}
+                        onInspect={setInspectData}
+                        viewSettings={viewSettings}
+                    />
                     <Environment preset="night" />
                 </Suspense>
 
@@ -166,6 +205,28 @@ export default function Viewer3D() {
                     title="Inspect Mode - Click on parts to see specs"
                 >
                     🔍 Inspect
+                </button>
+                <div className="divider" />
+                <button
+                    className="tool-btn"
+                    onClick={toggleViewMode}
+                    title={`View Mode: ${viewSettings.mode}`}
+                >
+                    {viewSettings.mode === 'standard' ? '🧊 Solid' : viewSettings.mode === 'wireframe' ? '🕸️ Wire' : '👻 X-Ray'}
+                </button>
+                <button
+                    className={`tool-btn ${viewSettings.showGrid ? 'active' : ''}`}
+                    onClick={() => setViewSettings(s => ({ ...s, showGrid: !s.showGrid }))}
+                    title="Toggle Grid"
+                >
+                    📏 Grid
+                </button>
+                <button
+                    className={`tool-btn ${viewSettings.showAxes ? 'active' : ''}`}
+                    onClick={() => setViewSettings(s => ({ ...s, showAxes: !s.showAxes }))}
+                    title="Toggle Axes"
+                >
+                    📍 Axes
                 </button>
             </div>
 
@@ -192,6 +253,7 @@ export default function Viewer3D() {
                 <span>🖱️ Drag to rotate</span>
                 <span>🔍 Scroll to zoom</span>
                 {inspectMode && <span className="active">👆 Click parts to inspect</span>}
+                <span className="mode-hint">Mode: {viewSettings.mode.toUpperCase()}</span>
             </div>
 
             <style jsx>{`
@@ -210,7 +272,15 @@ export default function Viewer3D() {
           top: 12px;
           left: 12px;
           display: flex;
+          align-items: center;
           gap: 8px;
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255,255,255,0.1);
+            margin: 0 4px;
         }
         
         .tool-btn {
@@ -222,6 +292,9 @@ export default function Viewer3D() {
           font-size: 12px;
           cursor: pointer;
           transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
         
         .tool-btn:hover {
@@ -309,6 +382,11 @@ export default function Viewer3D() {
 
         .viewer-hints .active {
           color: var(--accent-primary);
+        }
+
+        .mode-hint {
+            color: #d97706;
+            font-weight: 600;
         }
       `}</style>
         </div>

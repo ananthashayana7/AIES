@@ -9,10 +9,15 @@ import * as THREE from 'three';
 import { DesignIntent } from '@/lib/schemas/designIntent';
 import { GeneratedVariant } from '@/lib/variants/variantGenerator';
 
+interface ViewSettings {
+    mode: 'standard' | 'wireframe' | 'xray';
+}
+
 interface ParametricMeshProps {
     variant: GeneratedVariant;
     intent: DesignIntent;
     inspectMode?: boolean;
+    viewSettings?: ViewSettings;
     onClick?: (region: string) => void;
 }
 
@@ -23,7 +28,7 @@ const variantColors: Record<string, string> = {
     cost: '#d97706',
 };
 
-export default function ParametricMesh({ variant, intent, inspectMode, onClick }: ParametricMeshProps) {
+export default function ParametricMesh({ variant, intent, inspectMode, viewSettings, onClick }: ParametricMeshProps) {
     const meshRef = useRef<THREE.Group>(null);
 
     // Get custom params if available
@@ -60,6 +65,7 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
             intent={intent}
             variant={variant}
             scale={scale}
+            viewSettings={viewSettings}
             onClick={handleClick}
         />;
     }
@@ -71,6 +77,7 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
             intent={intent}
             variant={variant}
             scale={scale}
+            viewSettings={viewSettings}
             onClick={handleClick}
         />;
     }
@@ -82,6 +89,7 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
             intent={intent}
             variant={variant}
             scale={scale}
+            viewSettings={viewSettings}
             onClick={handleClick}
         />;
     }
@@ -92,18 +100,40 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
         intent={intent}
         variant={variant}
         scale={scale}
+        viewSettings={viewSettings}
         onClick={handleClick}
     />;
 }
 
+// Helper for material props based on view mode
+function useMaterialProps(viewSettings?: ViewSettings, baseColor: string = '#2a2a3a', baseMetalness: number = 0.5, baseRoughness: number = 0.5) {
+    const isWireframe = viewSettings?.mode === 'wireframe';
+    const isXray = viewSettings?.mode === 'xray';
+
+    return {
+        color: baseColor,
+        metalness: isXray ? 0.1 : baseMetalness,
+        roughness: isXray ? 0.1 : baseRoughness,
+        wireframe: isWireframe,
+        transparent: isXray,
+        opacity: isXray ? 0.3 : 1,
+        depthWrite: !isXray,
+        side: isXray ? THREE.DoubleSide : THREE.FrontSide,
+    };
+}
+
 // Fidget Spinner Generator
-function FidgetSpinnerMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
+function FidgetSpinnerMesh({ meshRef, params, intent, variant, scale, viewSettings, onClick }: any) {
     const diameter = parseFloat(params['Diameter']?.value || '80') * scale;
     const thickness = parseFloat(params['Thickness']?.value || '8') * scale;
     const arms = parseInt(params['Arms']?.value || '3');
     const bore = parseFloat(params['Bore Diameter']?.value || '22') * scale;
 
     const accentColor = variantColors[variant.variantType] || '#4f46e5';
+
+    const bodyMat = useMaterialProps(viewSettings, "#3a3a4a", 0.7, 0.3);
+    const hubMat = useMaterialProps(viewSettings, "#2a2a3a", 0.8, 0.2);
+    const weightMat = useMaterialProps(viewSettings, accentColor, 0.8, 0.2);
 
     // Create spinner arms
     const armGeometries = useMemo(() => {
@@ -138,7 +168,7 @@ function FidgetSpinnerMesh({ meshRef, params, intent, variant, scale, onClick }:
             {/* Center hub */}
             <mesh onClick={onClick('body')}>
                 <cylinderGeometry args={[bore * 1.3, bore * 1.3, thickness, 32]} />
-                <meshStandardMaterial color="#2a2a3a" metalness={0.8} roughness={0.2} />
+                <meshStandardMaterial {...hubMat} />
             </mesh>
 
             {/* Center bearing hole */}
@@ -150,7 +180,7 @@ function FidgetSpinnerMesh({ meshRef, params, intent, variant, scale, onClick }:
             {/* Arms */}
             {armGeometries.map((geom, i) => (
                 <mesh key={i} geometry={geom} castShadow onClick={onClick('body')}>
-                    <meshStandardMaterial color="#3a3a4a" metalness={0.7} roughness={0.3} />
+                    <meshStandardMaterial {...bodyMat} />
                 </mesh>
             ))}
 
@@ -165,7 +195,7 @@ function FidgetSpinnerMesh({ meshRef, params, intent, variant, scale, onClick }:
                         onClick={onClick('body')}
                     >
                         <cylinderGeometry args={[diameter * 0.12, diameter * 0.12, thickness, 24]} />
-                        <meshStandardMaterial color={accentColor} metalness={0.8} roughness={0.2} />
+                        <meshStandardMaterial {...weightMat} />
                     </mesh>
                 );
             })}
@@ -182,7 +212,7 @@ function FidgetSpinnerMesh({ meshRef, params, intent, variant, scale, onClick }:
 }
 
 // Gear Generator
-function GearMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
+function GearMesh({ meshRef, params, intent, variant, scale, viewSettings, onClick }: any) {
     const module = parseFloat(params['Module']?.value || '2');
     const teeth = parseInt(params['Teeth']?.value || '24');
     const faceWidth = parseFloat(params['Face Width']?.value || '15') * scale;
@@ -193,6 +223,9 @@ function GearMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
     const dedendum = 1.25 * module * scale;
 
     const accentColor = variantColors[variant.variantType] || '#4f46e5';
+
+    const bodyMat = useMaterialProps(viewSettings, "#3a3a4a", 0.75, 0.25);
+    const hubMat = useMaterialProps(viewSettings, "#2a2a3a", 0.8, 0.2);
 
     // Create gear profile
     const gearShape = useMemo(() => {
@@ -230,13 +263,13 @@ function GearMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
         <group ref={meshRef} position={[0, faceWidth / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <mesh castShadow onClick={onClick('body')}>
                 <extrudeGeometry args={[gearShape, { depth: faceWidth, bevelEnabled: false }]} />
-                <meshStandardMaterial color="#3a3a4a" metalness={0.75} roughness={0.25} />
+                <meshStandardMaterial {...bodyMat} />
             </mesh>
 
             {/* Hub */}
             <mesh position={[0, 0, faceWidth / 2]} onClick={onClick('body')}>
                 <cylinderGeometry args={[bore * 1.5, bore * 1.5, faceWidth * 1.2, 24]} rotation={[Math.PI / 2, 0, 0]} />
-                <meshStandardMaterial color="#2a2a3a" metalness={0.8} roughness={0.2} />
+                <meshStandardMaterial {...hubMat} />
             </mesh>
 
             <pointLight position={[0, 0.3, 0]} intensity={0.4} distance={2} color={accentColor} />
@@ -245,29 +278,32 @@ function GearMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
 }
 
 // Shaft Generator
-function ShaftMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
+function ShaftMesh({ meshRef, params, intent, variant, scale, viewSettings, onClick }: any) {
     const diameter = parseFloat(params['Diameter']?.value || '25') * scale;
     const length = parseFloat(params['Length']?.value || '150') * scale;
     const chamfer = parseFloat(params['Chamfer']?.value || '1') * scale;
 
     const accentColor = variantColors[variant.variantType] || '#4f46e5';
 
+    const bodyMat = useMaterialProps(viewSettings, "#4a4a5a", 0.75, 0.25);
+    const endMat = useMaterialProps(viewSettings, "#3a3a4a", 0.75, 0.25);
+
     return (
         <group ref={meshRef} position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             {/* Main shaft */}
             <mesh castShadow onClick={onClick('body')}>
                 <cylinderGeometry args={[diameter / 2, diameter / 2, length, 32]} />
-                <meshStandardMaterial color="#4a4a5a" metalness={0.75} roughness={0.25} />
+                <meshStandardMaterial {...bodyMat} />
             </mesh>
 
             {/* Chamfers */}
             <mesh position={[0, length / 2, 0]}>
                 <cylinderGeometry args={[diameter / 2 - chamfer, diameter / 2, chamfer * 2, 32]} />
-                <meshStandardMaterial color="#3a3a4a" metalness={0.75} roughness={0.25} />
+                <meshStandardMaterial {...endMat} />
             </mesh>
             <mesh position={[0, -length / 2, 0]}>
                 <cylinderGeometry args={[diameter / 2, diameter / 2 - chamfer, chamfer * 2, 32]} />
-                <meshStandardMaterial color="#3a3a4a" metalness={0.75} roughness={0.25} />
+                <meshStandardMaterial {...endMat} />
             </mesh>
 
             <pointLight position={[0, 0.3, 0]} intensity={0.4} distance={2} color={accentColor} />
@@ -276,7 +312,7 @@ function ShaftMesh({ meshRef, params, intent, variant, scale, onClick }: any) {
 }
 
 // Default Bracket Mesh
-function BracketMesh({ meshRef, intent, variant, scale, onClick }: any) {
+function BracketMesh({ meshRef, intent, variant, scale, viewSettings, onClick }: any) {
     const { L, W, H } = intent.envelope;
     const scaledL = L * scale;
     const scaledW = W * scale;
@@ -285,6 +321,8 @@ function BracketMesh({ meshRef, intent, variant, scale, onClick }: any) {
     const filletR = variant.filletRadius * scale;
 
     const accentColor = variantColors[variant.variantType] || '#4f46e5';
+
+    const bodyMat = useMaterialProps(viewSettings, "#2a2a3a", 0.75, 0.25);
 
     const bodyGeometry = useMemo(() => {
         const outerShape = new THREE.Shape();
@@ -325,7 +363,7 @@ function BracketMesh({ meshRef, intent, variant, scale, onClick }: any) {
     return (
         <group ref={meshRef} position={[0, scaledH / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <mesh geometry={bodyGeometry} castShadow receiveShadow onClick={onClick('body')}>
-                <meshStandardMaterial color="#2a2a3a" metalness={0.75} roughness={0.25} />
+                <meshStandardMaterial {...bodyMat} />
             </mesh>
             <pointLight position={[0, 0, scaledH + 0.1]} intensity={0.4} distance={1.5} color={accentColor} />
         </group>
