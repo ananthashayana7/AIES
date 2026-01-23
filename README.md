@@ -1,6 +1,5 @@
 # Cadence - Parametric Design Intelligence
 
-![Cadence Banner](https://raw.githubusercontent.com/placeholder/cadence-banner.png)
 
 **Cadence** is an AI-augmented design system for parametric engineering. It bridges the gap between rough design intent and manufacturable engineering specifications.
 
@@ -8,9 +7,9 @@
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
-### 🧠 AI-Driven Design
+### AI-Driven Design
 - **Natural Language Input**: Describe your part (e.g., *"Fidget spinner with 3 arms"* or *"Mounting bracket 150x80mm"*) and Cadence generates the specs.
 - **Rule Engine**: Deterministic checks for manufacturing constraints (wall thickness, hole spacing, mass limits).
 - **Risk Assessment**: Real-time evaluation of structural, manufacturing, and tolerance risks.
