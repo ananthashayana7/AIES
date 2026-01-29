@@ -501,9 +501,7 @@ function detectStandard(text: string, primitive: string, dims: Record<string, nu
 
     // Check for Bearing codes
     if (primitive === 'cylinder' || primitive.includes('bearing') || text.includes('bearing')) {
-        for (const code of Object.keys(MechanicalStandards.BEARINGS || {})) { // Accessing via internal map would be better but checking keys of export is hard without importing it fully as object
-            // Just regex for common bearing codes if convenient, or strictly look for known ones
-            // Since we can't iterate the export easily without 'import *', let's just rely on the regex for numbers and lookup
+        for (const code of Object.keys(MechanicalStandards.BEARINGS || {})) {
             const bearingMatch = text.match(new RegExp(`\\b${code}\\b`, 'i'));
             if (bearingMatch) {
                 const spec = MechanicalStandards.getBearing(code);
@@ -512,16 +510,27 @@ function detectStandard(text: string, primitive: string, dims: Record<string, nu
                     dims.radius = spec.outerDia / 2;
                     dims.height = spec.width;
                     dims.thickness = (spec.outerDia - spec.innerDia) / 2;
-                    // Inner diameter (hole)
                     dims.hole_diameter = spec.innerDia;
                     return code;
                 }
             }
         }
+    }
 
-        // Manual iteration of common codes since we can't iterate keys easily in this context?
-        // We imported MechanicalStandards. We can iterate MechanicalStandards.BEARINGS if we exported it.
-        // I exported BEARINGS in mechanical.ts, so I can import it.
+    // Check for NEMA Motor Mounts
+    // "Mounting bracket for NEMA 17", "NEMA 23 plate"
+    const nemaMatch = text.match(/\b(nema\s*\d+)\b/i);
+    if (nemaMatch) {
+        const designation = nemaMatch[1].toUpperCase().replace(/\s+/, ' '); // "NEMA 17"
+        const spec = MechanicalStandards.getMotorSpec(designation);
+        if (spec) {
+            // We don't set overall dimensions yet (that's the bracket size),
+            // but we signal the standard.
+            // We should add it to features so Generator picks it up.
+            // The parser function returns `standardSpec`, but Features are separate.
+            // We'll return it as standardSpec, and detection logic in `extractFeatures` should also pick it up.
+            return designation;
+        }
     }
 
     return undefined;
@@ -791,6 +800,12 @@ function extractFeatures(text: string): string[] {
 
     // Countersink
     if (/\bcountersink|countersunk\b/i.test(text)) features.push('countersunk');
+
+    // NEMA Mount Feature Detection
+    const nemaMatch = text.match(/\b(nema\s*\d+)\b/i);
+    if (nemaMatch) {
+        features.push(`${nemaMatch[1].toUpperCase().replace(/\s+/, ' ')} Mount`);
+    }
 
     return features;
 }
