@@ -17,7 +17,7 @@ export interface DesignIntent {
     materials: string[];
 
     // Named global parameters (e.g., "length_mm": 150)
-    parameters: Record<string, number | string>;
+    parameters: Record<string, any>;
 
     // Formal constraints
     constraints: IntentConstraint[];

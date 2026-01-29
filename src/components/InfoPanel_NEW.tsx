@@ -195,10 +195,11 @@ function GuidanceTab({ variant }: { variant: any }) {
 // AI Insights Tab - SRS F5 AI Reasoning & Insights
 function InsightsTab({ variant }: { variant: any }) {
     const aiReasoning = useAppStore(state => state.aiReasoning);
+    const solverResult = useAppStore(state => state.solverResult);
     const acceptSuggestion = useAppStore(state => state.acceptSuggestion);
     const rejectSuggestion = useAppStore(state => state.rejectSuggestion);
 
-    if (!aiReasoning) {
+    if (!aiReasoning && !solverResult) {
         return (
             <div className="empty-state">
                 <p>RUN ENGINE TO GENERATE AI INSIGHTS</p>
@@ -212,10 +213,32 @@ function InsightsTab({ variant }: { variant: any }) {
         );
     }
 
-    const { constraintViolations, suggestions, tradeoffs } = aiReasoning;
+    const { constraintViolations, suggestions, tradeoffs } = aiReasoning || { constraintViolations: [], suggestions: [], tradeoffs: { scenarios: [] } };
 
     return (
         <div className="insights-tab">
+            {/* Solver Logic (Layer 5) */}
+            {solverResult && (
+                <div className="section solver">
+                    <h3>ENGINEERING AGENT (LAYER 5)</h3>
+                    <div className="solver-result">
+                        <div className="rec-badge">
+                            RECOMMENDED: <strong>{solverResult.recommendedSpec}</strong>
+                        </div>
+                        <div className="metrics">
+                            <span>S.F.: {solverResult.safetyFactor.toFixed(2)}</span>
+                            <span>Mass: {solverResult.mass_g}g</span>
+                            <span>Iters: {solverResult.iterations}</span>
+                        </div>
+                        <div className="log-window">
+                            {solverResult.log.map((line, i) => (
+                                <div key={i} className="log-line">{line}</div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Constraint Violations */}
             {constraintViolations.length > 0 && (
                 <div className="section violations">
@@ -315,6 +338,16 @@ function InsightsTab({ variant }: { variant: any }) {
         .section { border: 1px solid #1a1a1a; padding: 16px; background: #000; }
         .section h3 { font-size: 11px; margin: 0 0 12px 0; letter-spacing: 1px; color: #fff; }
         
+        /* Solver */
+        .solver { border-color: #5599ff; }
+        .solver h3 { color: #5599ff; }
+        .solver-result { display: flex; flex-direction: column; gap: 12px; }
+        .rec-badge { font-size: 12px; color: #fff; background: #0a1a2f; padding: 8px; border: 1px solid #1e3a5f; }
+        .rec-badge strong { color: #5599ff; font-size: 14px; margin-left: 8px; }
+        .metrics { display: flex; gap: 16px; font-size: 10px; color: #888; font-family: var(--font-mono); }
+        .log-window { background: #050505; border: 1px solid #111; padding: 8px; max-height: 100px; overflow-y: auto; font-family: var(--font-mono); font-size: 9px; color: #666; }
+        .log-line { margin-bottom: 2px; }
+
         /* Violations */
         .violations .violation { margin-bottom: 12px; border-left: 3px solid #ff5555; padding-left: 12px; }
         .violations .violation.warn { border-left-color: #ffaa00; }

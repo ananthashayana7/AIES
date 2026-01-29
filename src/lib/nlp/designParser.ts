@@ -20,6 +20,7 @@ interface DesignContext {
     environment?: string;       // Where it's used: "outdoor", "underwater"
     sizeCategory?: string;      // Relative size: "small", "large", "standard"
     quantity?: number;          // How many
+    load?: number;              // Load in Newtons
     aesthetics?: string[];      // "sleek", "industrial", "decorative"
     constraints?: string[];     // "lightweight", "durable", "cheap"
 }
@@ -458,10 +459,14 @@ export function parseDesignDescription(description: string): ParsedDesign {
     // 6. Extract context
     const context = extractContext(lower, words);
 
-    // 7. Detect Standards (Layer 2 Engineering)
+    // 7. Extract Load (Layer 4/5 Trigger)
+    const load = extractLoad(lower);
+    if (load) context.load = load;
+
+    // 8. Detect Standards (Layer 2 Engineering)
     const standardSpec = detectStandard(lower, primitive, dimensions);
 
-    // 8. Apply size modifiers
+    // 9. Apply size modifiers
     applyContextualSizing(dimensions, lower, context);
 
     return {
@@ -788,6 +793,30 @@ function extractFeatures(text: string): string[] {
     if (/\bcountersink|countersunk\b/i.test(text)) features.push('countersunk');
 
     return features;
+}
+
+function extractLoad(text: string): number | undefined {
+    // Detect Forces
+    // "1000N", "10kN", "500 n", "5 kn"
+    const forceMatch = text.match(/(\d+(?:\.\d+)?)\s*(kn|n|newtons?)\b/i);
+    if (forceMatch) {
+        const val = parseFloat(forceMatch[1]);
+        const unit = forceMatch[2].toLowerCase();
+        if (unit.startsWith('k')) return val * 1000;
+        return val;
+    }
+
+    // Detect Mass (as Load) -> "hold 5kg" -> ~50N
+    const massMatch = text.match(/(?:hold|support|carry|load)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(kg|g|lbs)\b/i);
+    if (massMatch) {
+        const val = parseFloat(massMatch[1]);
+        const unit = massMatch[2].toLowerCase();
+        if (unit === 'kg') return val * 9.81;
+        if (unit === 'g') return (val / 1000) * 9.81;
+        if (unit === 'lbs') return val * 4.448; // 1 lb = 4.448 N
+    }
+
+    return undefined;
 }
 
 function extractContext(text: string, words: string[]): DesignContext {
