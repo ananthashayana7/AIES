@@ -1,6 +1,8 @@
 // Advanced NLP Design Parser v2.0
 // Understands natural language with context awareness, synonyms, and semantic understanding
 
+import MechanicalStandards from '../standards/mechanical';
+
 interface ParsedDesign {
     primitiveType: string;
     dimensions: Record<string, number>;
@@ -10,6 +12,7 @@ interface ParsedDesign {
     profile: string;
     confidence: number;
     context: DesignContext;
+    standardSpec?: string; // e.g. "M10", "608"
 }
 
 interface DesignContext {
@@ -455,7 +458,10 @@ export function parseDesignDescription(description: string): ParsedDesign {
     // 6. Extract context
     const context = extractContext(lower, words);
 
-    // 7. Apply size modifiers
+    // 7. Detect Standards (Layer 2 Engineering)
+    const standardSpec = detectStandard(lower, primitive, dimensions);
+
+    // 8. Apply size modifiers
     applyContextualSizing(dimensions, lower, context);
 
     return {
@@ -466,8 +472,54 @@ export function parseDesignDescription(description: string): ParsedDesign {
         features,
         profile,
         confidence,
-        context
+        context,
+        standardSpec
     };
+}
+
+function detectStandard(text: string, primitive: string, dims: Record<string, number>): string | undefined {
+    // Check for Metric Thread codes (e.g. "M10")
+    const mCodeMatch = text.match(/\b(m\d+(?:\.\d+)?)\b/i);
+    if (mCodeMatch) {
+        const designation = mCodeMatch[1].toUpperCase();
+        const spec = MechanicalStandards.getThreadSpec(designation);
+        if (spec) {
+            // Apply standard dimensions
+            dims.diameter = spec.majorDia;
+            dims.radius = spec.majorDia / 2;
+
+            // If it's a bolt/screw, we can infer head dimensions too if needed
+            // But ThreadGenerator handles that if we pass the spec string
+            return designation;
+        }
+    }
+
+    // Check for Bearing codes
+    if (primitive === 'cylinder' || primitive.includes('bearing') || text.includes('bearing')) {
+        for (const code of Object.keys(MechanicalStandards.BEARINGS || {})) { // Accessing via internal map would be better but checking keys of export is hard without importing it fully as object
+            // Just regex for common bearing codes if convenient, or strictly look for known ones
+            // Since we can't iterate the export easily without 'import *', let's just rely on the regex for numbers and lookup
+            const bearingMatch = text.match(new RegExp(`\\b${code}\\b`, 'i'));
+            if (bearingMatch) {
+                const spec = MechanicalStandards.getBearing(code);
+                if (spec) {
+                    dims.diameter = spec.outerDia;
+                    dims.radius = spec.outerDia / 2;
+                    dims.height = spec.width;
+                    dims.thickness = (spec.outerDia - spec.innerDia) / 2;
+                    // Inner diameter (hole)
+                    dims.hole_diameter = spec.innerDia;
+                    return code;
+                }
+            }
+        }
+
+        // Manual iteration of common codes since we can't iterate keys easily in this context?
+        // We imported MechanicalStandards. We can iterate MechanicalStandards.BEARINGS if we exported it.
+        // I exported BEARINGS in mechanical.ts, so I can import it.
+    }
+
+    return undefined;
 }
 
 function tokenize(text: string): string[] {
@@ -826,6 +878,7 @@ export function generateDesignIntent(parsed: ParsedDesign): any {
         parameters: {
             profile: parsed.profile,
             primitive_type: parsed.primitiveType,
+            thread: parsed.standardSpec, // Pass the detected standard (e.g. "M10")
             length_mm: Math.round(parsed.dimensions.length || 100),
             width_mm: Math.round(parsed.dimensions.width || 100),
             height_mm: Math.round(parsed.dimensions.height || 20),

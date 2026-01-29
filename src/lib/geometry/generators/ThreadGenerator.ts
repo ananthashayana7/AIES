@@ -3,20 +3,7 @@
 
 import * as THREE from 'three';
 import { BaseGenerator, GeometrySpec, GeneratedGeometry } from './BaseGenerator';
-
-// Standard metric thread specifications
-const METRIC_THREADS: Record<string, { pitch: number; minorDia: number }> = {
-    'M2': { pitch: 0.4, minorDia: 1.567 },
-    'M3': { pitch: 0.5, minorDia: 2.459 },
-    'M4': { pitch: 0.7, minorDia: 3.242 },
-    'M5': { pitch: 0.8, minorDia: 4.134 },
-    'M6': { pitch: 1.0, minorDia: 4.917 },
-    'M8': { pitch: 1.25, minorDia: 6.647 },
-    'M10': { pitch: 1.5, minorDia: 8.376 },
-    'M12': { pitch: 1.75, minorDia: 10.106 },
-    'M16': { pitch: 2.0, minorDia: 13.835 },
-    'M20': { pitch: 2.5, minorDia: 17.294 }
-};
+import MechanicalStandards from '../../standards/mechanical';
 
 export class ThreadGenerator extends BaseGenerator {
     generate(spec: GeometrySpec): GeneratedGeometry {
@@ -28,22 +15,48 @@ export class ThreadGenerator extends BaseGenerator {
         const headType = params.head_type?.toString() || 'hex'; // 'hex', 'socket', 'pan', 'flat', 'none'
         const fastenerType = params.type?.toString() || 'bolt'; // 'bolt', 'nut', 'stud', 'standoff'
 
-        // Parse thread size
+        // Parse thread size using Standards Library
+        const standardSpec = MechanicalStandards.getThreadSpec(threadSize);
+
+        // Fallback or Standard values
         const sizeNum = parseFloat(threadSize.replace(/[^0-9.]/g, '')) || 6;
-        const threadSpec = METRIC_THREADS[threadSize.toUpperCase()] || {
-            pitch: sizeNum / 6,
-            minorDia: sizeNum * 0.82
-        };
 
-        const majorDia = sizeNum;
-        const pitch = threadSpec.pitch;
-        const minorDia = threadSpec.minorDia;
+        let majorDia = sizeNum;
+        let pitch = sizeNum / 6;
+        let minorDia = sizeNum * 0.82;
+        let headHeight = sizeNum * 0.7;
+        let headDia = sizeNum * 1.7; // Default hex point-to-point approx
+        let socketDia = sizeNum * 0.6; // Default socket size
+        let socketDepth = sizeNum * 0.5;
 
-        // Head dimensions (based on ISO standards)
-        const headHeight = sizeNum * 0.7;
-        const headDia = sizeNum * 1.7; // Hex head across flats
-        const socketDia = sizeNum * 1.5;
-        const socketDepth = sizeNum * 0.5;
+        if (standardSpec) {
+            majorDia = standardSpec.majorDia;
+            pitch = standardSpec.pitch;
+            minorDia = standardSpec.minorDia;
+
+            if (headType === 'socket') {
+                headHeight = standardSpec.socketHead.height;
+                headDia = standardSpec.socketHead.diameter;
+                socketDia = standardSpec.socketHead.socketSize;
+                socketDepth = standardSpec.socketHead.socketDepth;
+            } else if (headType === 'hex') {
+                headHeight = standardSpec.hexHead.height;
+                // For cylinder with 6 segments (hex), radius is distance to corner.
+                // WidthAcrossFlats (s) = sqrt(3) * Radius.
+                // Radius = s / sqrt(3) = s / 1.732.
+                // Wait, Diameter = 2 * Radius.
+                // So Diameter(CornerToCorner) = 2 * s / 1.732 = s * 1.1547.
+                // The createBolt method uses headRadius for the cylinder.
+                // We should pass the diameter that corresponds to the corners?
+                // createBolt calls: new CylinderGeometry(headRadius, ...)
+                // If segments=6, headRadius is the corner radius.
+                headDia = standardSpec.hexHead.widthAcrossFlats * 1.1547;
+            } else {
+                // Pan/Flat etc - approximate from hex/socket
+                headHeight = standardSpec.socketHead.height * 0.8;
+                headDia = standardSpec.socketHead.diameter * 1.2;
+            }
+        }
 
         // Convert to meters
         const s = 0.01;
