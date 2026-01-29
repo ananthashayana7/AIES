@@ -10,10 +10,11 @@ import { DesignIntent, IntentConstraint } from '@/lib/schemas/designIntent';
 import { MATERIAL_LIBRARY } from '@/lib/simulation/materialLibrary';
 
 import SpecInputForm from './SpecInputForm';
+import AgentChat from './AgentChat';
 
 export default function SpecInput() {
   const { setDesignIntent, generateGuidance, isProcessing: storeProcessing, designIntent } = useAppStore();
-  const [activeTab, setActiveTab] = useState<'structured' | 'json' | 'wizard'>('structured');
+  const [activeTab, setActiveTab] = useState<'structured' | 'json' | 'wizard' | 'agent'>('agent');
   const [bulkText, setBulkText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -164,12 +165,18 @@ export default function SpecInput() {
   return (
     <div className="intent-editor">
       <div className="tab-header">
+        <button className={activeTab === 'agent' ? 'active' : ''} onClick={() => setActiveTab('agent')}>AGENT</button>
         <button className={activeTab === 'structured' ? 'active' : ''} onClick={() => setActiveTab('structured')}>STRUCTURED</button>
         <button className={activeTab === 'json' ? 'active' : ''} onClick={() => { setBulkText(JSON.stringify(localIntent, null, 2)); setActiveTab('json'); }}>JSON</button>
-        <button className={activeTab === 'wizard' ? 'active' : ''} onClick={() => setActiveTab('wizard')}>WIZARD</button>
       </div>
 
       <div className="scroll-area">
+        {activeTab === 'agent' && (
+          <div style={{ height: '100%' }}>
+            <AgentChat />
+          </div>
+        )}
+
         {activeTab === 'wizard' && (
           <div className="p-4">
             <SpecInputForm onSubmit={handleWizardSubmit} isLoading={isGenerating} />

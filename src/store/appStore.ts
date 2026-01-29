@@ -8,6 +8,7 @@ import { DesignIntent, exampleDesignIntent } from '../lib/schemas/designIntent';
 import { GeneratedVariant, generateVariants } from '../lib/variants/variantGenerator';
 
 import { SimulationResult, runMaterialSimulation } from '../lib/simulation/simulationEngine';
+import { EngineeringSolver, SolverResult } from '../lib/ai/solver';
 import { AIReasoning } from '../lib/schemas/aiReasoning';
 import { analyzeDesign } from '../lib/ai/aiReasoner';
 import { RuleCheckResult, evaluateRules } from '../lib/rules/ruleEngine';
@@ -15,6 +16,9 @@ import { RuleCheckResult, evaluateRules } from '../lib/rules/ruleEngine';
 interface AppState {
     // SRS F2: Design Intent (Source of Truth)
     designIntent: DesignIntent | null;
+
+    // Layer 5: Solver Result
+    solverResult: SolverResult | null;
 
     // Generated variations/guidance sets
     variants: GeneratedVariant[];
@@ -43,6 +47,7 @@ interface AppState {
 
     // Actions
     setDesignIntent: (intent: DesignIntent) => void;
+    runAgentSolver: () => void;
     loadExample: () => void;
     generateGuidance: () => void;
     generateSimulation: () => void;
@@ -71,6 +76,7 @@ export const useAppStore = create<AppState>()(
         (set, get) => ({
             // Initial state
             designIntent: null,
+            solverResult: null,
             variants: [],
             selectedVariantId: null,
             simulationResults: [],
@@ -83,7 +89,48 @@ export const useAppStore = create<AppState>()(
             exportTrigger: null,
 
             setDesignIntent: (intent) => {
-                set({ designIntent: intent, variants: [], selectedVariantId: null, simulationResults: [], aiReasoning: null, ruleCheckResult: null });
+                set({
+                    designIntent: intent,
+                    solverResult: null,
+                    variants: [],
+                    selectedVariantId: null,
+                    simulationResults: [],
+                    aiReasoning: null,
+                    ruleCheckResult: null
+                });
+                // Trigger Solver if context suggests
+                if (intent.parameters.context?.load && intent.parameters.primitive_type === 'bolt') {
+                    get().runAgentSolver();
+                }
+            },
+
+            runAgentSolver: () => {
+                const { designIntent } = get();
+                if (!designIntent) return;
+
+                const load = designIntent.parameters.context?.load;
+                const type = designIntent.parameters.primitive_type;
+                const mat = designIntent.materials[0] || 'Steel S235';
+
+                if (load && type === 'bolt') {
+                    const result = EngineeringSolver.solveComponent('bolt', load, mat);
+
+                    if (result.recommendedSpec !== 'None') {
+                        // Apply the recommendation
+                        const newIntent = { ...designIntent };
+                        newIntent.parameters.thread = result.recommendedSpec;
+                        // Clear manual dims to let generator use standard
+                        // But we might want to keep length
+
+                        set({
+                            designIntent: newIntent,
+                            solverResult: result,
+                            activePanel: 'insights' // Switch to show reasoning
+                        });
+                    } else {
+                        set({ solverResult: result });
+                    }
+                }
             },
 
             loadExample: () => {
@@ -207,6 +254,7 @@ export const useAppStore = create<AppState>()(
             reset: () => {
                 set({
                     designIntent: null,
+                    solverResult: null,
                     variants: [],
                     selectedVariantId: null,
                     simulationResults: [],
