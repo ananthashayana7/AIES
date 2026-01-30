@@ -6,6 +6,7 @@
 
 import { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { useAppStore } from '@/store/appStore';
 import { ExportManager } from '@/lib/export/ExportManager';
 import { DesignIntent } from '@/lib/schemas/designIntent';
 import { GeneratedVariant } from '@/lib/variants/variantGenerator';
@@ -15,6 +16,7 @@ interface ParametricMeshProps {
     variant: GeneratedVariant;
     intent: DesignIntent;
     inspectMode?: boolean;
+    heatmapData?: Float32Array; // Optional visual FEM data
     onClick?: (region: string) => void;
 }
 
@@ -318,7 +320,33 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
     };
 
     const params = variant.parameters;
-    const simMode = params['sim_mode'] === 'Heatmap';
+    const showHeatmap = useAppStore(state => state.showHeatmap);
+    const activeVisual = showHeatmap || inspectMode || params['sim_mode'] === 'Heatmap';
+
+    // Apply Heatmap Colors if available
+    useEffect(() => {
+        if (meshRef.current && geometry && activeVisual) {
+            const mesh = meshRef.current.children[0] as THREE.Mesh;
+            if (mesh && mesh.geometry) {
+                // Simple mockup: Color based on X position (cantilever stress)
+                const count = mesh.geometry.attributes.position.count;
+                const colors = new Float32Array(count * 3);
+                const positions = mesh.geometry.attributes.position;
+
+                for (let i = 0; i < count; i++) {
+                    const x = positions.getX(i);
+                    // Normalize x (approx 0 to 0.2m)
+                    const stress = Math.min(1, Math.max(0, (x + 0.1) * 5));
+                    // Blue (0) -> Red (1)
+                    colors[i * 3] = stress;     // R
+                    colors[i * 3 + 1] = 0;      // G
+                    colors[i * 3 + 2] = 1 - stress; // B
+                }
+
+                mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            }
+        }
+    }, [geometry, inspectMode]);
 
     // Determine Material Visuals
     const materialName = (typeof intent.materials[0] === 'string' ? intent.materials[0] : 'Aluminum') || 'Aluminum';
@@ -340,7 +368,7 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
         return (
             <group ref={meshRef} position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                 <primitive object={geometry} onClick={handleClick('body')} />
-                {simMode && (
+                {activeVisual && (
                     <pointLight position={[0.5, 0.5, 0.1]} intensity={2} color="#ff0000" />
                 )}
                 <ambientLight intensity={1.0} />
@@ -353,13 +381,11 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
     return (
         <group ref={meshRef} position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <mesh geometry={geometry as THREE.BufferGeometry} onClick={handleClick('body')}>
-                {simMode ? (
+                {activeVisual ? (
                     <meshStandardMaterial
-                        color="#ff0000"
-                        emissive="#ff3300"
-                        emissiveIntensity={0.8}
-                        transparent
-                        opacity={0.7}
+                        vertexColors
+                        side={THREE.DoubleSide}
+                        roughness={0.5}
                     />
                 ) : (
                     <meshPhysicalMaterial
@@ -369,14 +395,14 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
                 )}
             </mesh>
             <mesh geometry={geometry as THREE.BufferGeometry}>
-                <meshStandardMaterial color={simMode ? "#fff" : "#000000"} wireframe transparent opacity={0.1} />
+                <meshStandardMaterial color={activeVisual ? "#fff" : "#000000"} wireframe transparent opacity={0.1} />
             </mesh>
 
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={1.0} />
             <directionalLight position={[-5, 5, 5]} intensity={1.5} />
 
-            {simMode && (
+            {activeVisual && (
                 <pointLight position={[0.5, 0.5, 0.1]} intensity={2} color="#ff0000" />
             )}
         </group>

@@ -43,6 +43,7 @@ interface AppState {
     // UI state
     isProcessing: boolean;
     showJsonEditor: boolean;
+    showHeatmap: boolean; // Visual FEM toggle
     activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation';
 
     // Actions
@@ -58,6 +59,7 @@ interface AppState {
     selectVariant: (id: string) => void;
     setActivePanel: (panel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation') => void;
     toggleJsonEditor: () => void;
+    setHeatmap: (show: boolean) => void;
     reset: () => void;
 
     // Audit/Export Trigger
@@ -85,6 +87,7 @@ export const useAppStore = create<AppState>()(
             reviewDecisions: {},
             isProcessing: false,
             showJsonEditor: false,
+            showHeatmap: false,
             activePanel: 'intent',
             exportTrigger: null,
 
@@ -259,6 +262,10 @@ export const useAppStore = create<AppState>()(
 
             toggleJsonEditor: () => {
                 set((state) => ({ showJsonEditor: !state.showJsonEditor }));
+            },
+
+            setHeatmap: (show) => {
+                set({ showHeatmap: show });
             },
 
             reset: () => {

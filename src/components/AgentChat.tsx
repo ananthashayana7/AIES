@@ -64,6 +64,8 @@ export default function AgentChat() {
             } else if (response.action === 'trigger_simulation') {
                 generateSimulation();
                 generateGuidance(); // Refresh geometry
+            } else if (response.action === 'show_heatmap') {
+                useAppStore.getState().setHeatmap(true);
             } else if (response.intentUpdate) {
                 generateGuidance(); // Refresh geometry for any param change
             }

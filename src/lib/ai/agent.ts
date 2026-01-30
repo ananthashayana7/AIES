@@ -15,7 +15,7 @@ export interface AgentMessage {
 export interface AgentResponse {
     text: string;
     intentUpdate?: Partial<DesignIntent>;
-    action?: 'trigger_solver' | 'trigger_simulation';
+    action?: 'trigger_solver' | 'trigger_simulation' | 'show_heatmap';
 }
 
 export class EngineeringAgent {
@@ -99,7 +99,15 @@ export class EngineeringAgent {
             };
         }
 
-        // 4. Check for New Design (Reset)
+        // 4. Check for Visualization Intents
+        if (lower.includes('show stress') || lower.includes('show heatmap') || lower.includes('fem')) {
+            return {
+                text: "Activating real-time stress visualization (FEM). Red areas indicate peak stress.",
+                action: 'show_heatmap'
+            };
+        }
+
+        // 5. Check for New Design (Reset)
         if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a")) {
             // Full re-parse
             const newParams: Record<string, any> = { ...parsed.dimensions, ...parsed.context, primitive_type: parsed.primitiveType };
