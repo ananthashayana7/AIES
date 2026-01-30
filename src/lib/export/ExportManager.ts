@@ -1,10 +1,26 @@
 
 import * as THREE from 'three';
 import { jsPDF } from 'jspdf';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { DesignIntent } from '../schemas/designIntent';
 import { GeneratedVariant } from '../variants/variantGenerator';
 
 export class ExportManager {
+    static downloadGLTF(mesh: THREE.Object3D, filename: string) {
+        const exporter = new GLTFExporter();
+        exporter.parse(
+            mesh,
+            (gltf) => {
+                const output = JSON.stringify(gltf, null, 2);
+                this.triggerDownload(output, filename + '.gltf', 'model/gltf+json');
+            },
+            (error) => {
+                console.error('An error happened during GLTF export', error);
+            },
+            { binary: false }
+        );
+    }
+
     static downloadPDF(intent: DesignIntent, variant: GeneratedVariant, filename: string) {
         const doc = new jsPDF();
 
