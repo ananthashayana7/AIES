@@ -8,6 +8,7 @@ import { OrbitControls, PerspectiveCamera, Html, Grid, Environment, ContactShado
 import { Suspense, useState } from 'react';
 import { useSelectedVariant, useAppStore } from '@/store/appStore';
 import ParametricMesh from './ParametricMesh';
+import EngineeringDimensions from './EngineeringDimensions';
 import * as THREE from 'three';
 
 interface InspectData {
@@ -48,6 +49,31 @@ function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (d
         );
     }
 
+    // Calc BBox for dimensions
+    // Note: We need the actual geometry to get the bbox.
+    // ParametricMesh generates it internally.
+    // We can estimate it from variant parameters or pass a callback ref?
+    // For God Mode, let's just use the `dimensions` from metadata if available, or visual estimation.
+    // Actually, ParametricMesh should ideally expose the mesh ref.
+    // But passing refs through Suspense/Custom components is tricky without forwardRef.
+    // Let's implement a simpler "Ideal" bounding box based on intent parameters for the visual.
+
+    const bbox = new THREE.Box3();
+    const l = (parseFloat(variant.parameters.length_mm?.toString() || '100') / 100) / 2;
+    const w = (parseFloat(variant.parameters.width_mm?.toString() || '100') / 100) / 2;
+    const h = (parseFloat(variant.parameters.height_mm?.toString() || '20') / 100) / 2;
+
+    // Check if Cylinder
+    const isCyl = variant.parameters.primitive_type === 'cylinder' || variant.parameters.primitive_type === 'bolt';
+    if (isCyl) {
+        const r = (parseFloat(variant.parameters.diameter_mm?.toString() || '50') / 100) / 2;
+        bbox.min.set(-r, 0, -r);
+        bbox.max.set(r, h*2, r);
+    } else {
+        bbox.min.set(-l, 0, -w);
+        bbox.max.set(l, h*2, w);
+    }
+
     return (
         <>
             <ParametricMesh
@@ -56,6 +82,7 @@ function Scene({ inspectMode, onInspect }: { inspectMode: boolean; onInspect: (d
                 inspectMode={inspectMode}
                 onClick={handleClick}
             />
+            <EngineeringDimensions visible={inspectMode} bbox={bbox} />
         </>
     );
 }

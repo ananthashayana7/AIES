@@ -116,33 +116,31 @@ export const useAppStore = create<AppState>()(
                 const mat = designIntent.materials[0] || 'Steel S235';
 
                 if (load) {
-                    // Dispatch to generalized solver (handles bolts, plates, brackets)
-                    const result = EngineeringSolver.solveComponent(type, load, mat);
+                    // Dispatch to generalized solver (Async)
+                    EngineeringSolver.solveComponent(type, load, mat).then(result => {
+                        if (result.recommendedSpec !== 'None') {
+                            const newParams = { ...designIntent.parameters };
 
-                    if (result.recommendedSpec !== 'None') {
-                        // Apply the recommendation (Immutable update)
-                        const newParams = { ...designIntent.parameters };
-
-                        if (type === 'bolt') {
-                            newParams.thread = result.recommendedSpec;
-                        } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(type)) {
-                            // Extract thickness from "5mm Plate"
-                            const thickMatch = result.recommendedSpec.match(/(\d+)mm/);
-                            if (thickMatch) {
-                                newParams.thickness_mm = parseFloat(thickMatch[1]);
+                            if (type === 'bolt') {
+                                newParams.thread = result.recommendedSpec;
+                            } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(type)) {
+                                const thickMatch = result.recommendedSpec.match(/(\d+)mm/);
+                                if (thickMatch) {
+                                    newParams.thickness_mm = parseFloat(thickMatch[1]);
+                                }
                             }
+
+                            const newIntent = { ...designIntent, parameters: newParams };
+
+                            set({
+                                designIntent: newIntent,
+                                solverResult: result,
+                                activePanel: 'insights'
+                            });
+                        } else {
+                            set({ solverResult: result });
                         }
-
-                        const newIntent = { ...designIntent, parameters: newParams };
-
-                        set({
-                            designIntent: newIntent,
-                            solverResult: result,
-                            activePanel: 'insights' // Switch to show reasoning
-                        });
-                    } else {
-                        set({ solverResult: result });
-                    }
+                    });
                 }
             },
 
