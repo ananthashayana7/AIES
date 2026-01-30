@@ -464,16 +464,43 @@ function SimulationTab() {
 }
 
 // Audit Tab
+import { ExportManager } from '@/lib/export/ExportManager';
+
 function AuditTab({ variant }: { variant: any }) {
+    const intent = useAppStore(state => state.designIntent);
+
+    const handleExportPDF = () => {
+        if (intent && variant) {
+            ExportManager.downloadPDF(intent, variant, intent.part_id || 'report');
+        }
+    };
+
     return (
         <div className="audit-tab">
             <div className="section">
                 <h3>REVIEW STATUS</h3>
-                <p className="placeholder">Human-in-the-loop audit trail will appear here</p>
-                <p className="note">SRS F8: Review decisions, timestamps, and sign-off</p>
+                <p className="placeholder">Human-in-the-loop audit trail.</p>
+
+                <div className="actions">
+                    <button className="export-btn" onClick={handleExportPDF}>
+                        📄 DOWNLOAD DFM REPORT (PDF)
+                    </button>
+                </div>
             </div>
 
             <style jsx>{`
+                .export-btn {
+                    width: 100%;
+                    background: #fff;
+                    color: #000;
+                    border: none;
+                    padding: 8px;
+                    font-size: 10px;
+                    font-weight: 800;
+                    cursor: pointer;
+                    margin-top: 12px;
+                }
+                .export-btn:hover { background: #eee; }
         .audit-tab { display: flex; flex-direction: column; gap: 20px; }
         .section { border: 1px solid #1a1a1a; padding: 16px; background: #000; }
         .section h3 { font-size: 11px; margin: 0 0 12px 0; letter-spacing: 1px; color: #666; }
