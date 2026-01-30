@@ -10,6 +10,7 @@ export default function InfoPanel() {
 
     const tabs = [
         { id: 'guidance', label: 'CAD GUIDANCE' },
+        { id: 'manufacturing', label: 'CAM / SOP' },
         { id: 'insights', label: 'AI INSIGHTS' },
         { id: 'simulation', label: 'MATERIAL SIM' },
         { id: 'audit', label: 'AUDIT & REVIEW' },
@@ -31,6 +32,7 @@ export default function InfoPanel() {
 
             <div className="tab-content">
                 {activePanel === 'guidance' && <GuidanceTab variant={variant} />}
+                {activePanel === 'manufacturing' && <ManufacturingTab />}
                 {activePanel === 'insights' && <InsightsTab variant={variant} />}
                 {activePanel === 'simulation' && <SimulationTab />}
                 {activePanel === 'audit' && <AuditTab variant={variant} />}
@@ -459,6 +461,54 @@ function SimulationTab() {
 
         .empty { color: #222; font-size: 10px; text-align: center; padding: 40px; }
       `}</style>
+        </div>
+    );
+}
+
+// Manufacturing Tab (CAM / SOP)
+function ManufacturingTab() {
+    const plan = useAppStore(state => state.manufacturingPlan);
+
+    if (!plan) return <div className="empty">GENERATE DESIGN TO VIEW SOP</div>;
+
+    return (
+        <div className="mfg-tab">
+            <div className="mfg-header">
+                <h3>MANUFACTURING PLAN (SOP)</h3>
+                <p>Stock: {plan.stockSize}</p>
+                <p>Est. Cycle Time: {plan.totalTime_min} min</p>
+                <p>Est. Cost: ${plan.estimatedCost}</p>
+            </div>
+
+            <div className="steps-list">
+                {plan.steps.map((step: any, i: number) => (
+                    <div key={i} className="op-step">
+                        <div className="op-num">OP {step.order}</div>
+                        <div className="op-details">
+                            <span className="op-process">{step.process.toUpperCase()}</span>
+                            <span className="op-desc">{step.description}</span>
+                            <span className="op-tool">Tool: {step.tool} ({step.estTime_min} min)</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <style jsx>{`
+                .mfg-tab { display: flex; flex-direction: column; gap: 16px; font-family: var(--font-mono); }
+                .mfg-header { padding-bottom: 12px; border-bottom: 1px solid #222; }
+                .mfg-header h3 { color: #5599ff; font-size: 11px; margin: 0 0 8px 0; }
+                .mfg-header p { font-size: 10px; color: #888; margin: 2px 0; }
+
+                .steps-list { display: flex; flex-direction: column; gap: 8px; }
+                .op-step { display: flex; gap: 12px; background: #080808; padding: 8px; border: 1px solid #222; }
+                .op-num { font-weight: 800; color: #444; font-size: 10px; min-width: 30px; }
+                .op-details { display: flex; flex-direction: column; gap: 2px; }
+                .op-process { font-size: 9px; color: #5599ff; font-weight: 700; }
+                .op-desc { font-size: 10px; color: #fff; }
+                .op-tool { font-size: 9px; color: #666; }
+
+                .empty { color: #444; font-size: 10px; text-align: center; padding: 40px; }
+            `}</style>
         </div>
     );
 }
