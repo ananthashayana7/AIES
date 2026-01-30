@@ -117,18 +117,20 @@ export const useAppStore = create<AppState>()(
                     const result = EngineeringSolver.solveComponent(type, load, mat);
 
                     if (result.recommendedSpec !== 'None') {
-                        // Apply the recommendation
-                        const newIntent = { ...designIntent };
+                        // Apply the recommendation (Immutable update)
+                        const newParams = { ...designIntent.parameters };
 
                         if (type === 'bolt') {
-                            newIntent.parameters.thread = result.recommendedSpec;
+                            newParams.thread = result.recommendedSpec;
                         } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(type)) {
                             // Extract thickness from "5mm Plate"
                             const thickMatch = result.recommendedSpec.match(/(\d+)mm/);
                             if (thickMatch) {
-                                newIntent.parameters.thickness_mm = parseFloat(thickMatch[1]);
+                                newParams.thickness_mm = parseFloat(thickMatch[1]);
                             }
                         }
+
+                        const newIntent = { ...designIntent, parameters: newParams };
 
                         set({
                             designIntent: newIntent,

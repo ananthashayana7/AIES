@@ -192,8 +192,14 @@ export const MechanicalStandards = {
     },
 
     getMotorSpec: (designation: string): NemaSpec | null => {
-        // Handle "NEMA 17", "Nema17", "17" if context implies motor
-        const clean = designation.toUpperCase().replace('NEMA', '').trim();
+        // Handle "NEMA 17", "Nema17", "17", "NEMA 17 Mount"
+        // Remove "MOUNT", "BRACKET", "NEMA" to isolate the number
+        const clean = designation.toUpperCase()
+            .replace('MOUNT', '')
+            .replace('BRACKET', '')
+            .replace('NEMA', '')
+            .trim();
+
         const key = `NEMA ${clean}`;
         return NEMA_MOTORS[key] || null;
     },
