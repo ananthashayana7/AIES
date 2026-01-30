@@ -43,6 +43,7 @@ interface AppState {
     // UI state
     isProcessing: boolean;
     showJsonEditor: boolean;
+    showHeatmap: boolean; // Visual FEM toggle
     activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation';
 
     // Actions
@@ -58,6 +59,7 @@ interface AppState {
     selectVariant: (id: string) => void;
     setActivePanel: (panel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation') => void;
     toggleJsonEditor: () => void;
+    setHeatmap: (show: boolean) => void;
     reset: () => void;
 
     // Audit/Export Trigger
@@ -85,6 +87,7 @@ export const useAppStore = create<AppState>()(
             reviewDecisions: {},
             isProcessing: false,
             showJsonEditor: false,
+            showHeatmap: false,
             activePanel: 'intent',
             exportTrigger: null,
 
@@ -113,31 +116,31 @@ export const useAppStore = create<AppState>()(
                 const mat = designIntent.materials[0] || 'Steel S235';
 
                 if (load) {
-                    // Dispatch to generalized solver (handles bolts, plates, brackets)
-                    const result = EngineeringSolver.solveComponent(type, load, mat);
+                    // Dispatch to generalized solver (Async)
+                    EngineeringSolver.solveComponent(type, load, mat).then(result => {
+                        if (result.recommendedSpec !== 'None') {
+                            const newParams = { ...designIntent.parameters };
 
-                    if (result.recommendedSpec !== 'None') {
-                        // Apply the recommendation
-                        const newIntent = { ...designIntent };
-
-                        if (type === 'bolt') {
-                            newIntent.parameters.thread = result.recommendedSpec;
-                        } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(type)) {
-                            // Extract thickness from "5mm Plate"
-                            const thickMatch = result.recommendedSpec.match(/(\d+)mm/);
-                            if (thickMatch) {
-                                newIntent.parameters.thickness_mm = parseFloat(thickMatch[1]);
+                            if (type === 'bolt') {
+                                newParams.thread = result.recommendedSpec;
+                            } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(type)) {
+                                const thickMatch = result.recommendedSpec.match(/(\d+)mm/);
+                                if (thickMatch) {
+                                    newParams.thickness_mm = parseFloat(thickMatch[1]);
+                                }
                             }
-                        }
 
-                        set({
-                            designIntent: newIntent,
-                            solverResult: result,
-                            activePanel: 'insights' // Switch to show reasoning
-                        });
-                    } else {
-                        set({ solverResult: result });
-                    }
+                            const newIntent = { ...designIntent, parameters: newParams };
+
+                            set({
+                                designIntent: newIntent,
+                                solverResult: result,
+                                activePanel: 'insights'
+                            });
+                        } else {
+                            set({ solverResult: result });
+                        }
+                    });
                 }
             },
 
@@ -257,6 +260,10 @@ export const useAppStore = create<AppState>()(
 
             toggleJsonEditor: () => {
                 set((state) => ({ showJsonEditor: !state.showJsonEditor }));
+            },
+
+            setHeatmap: (show) => {
+                set({ showHeatmap: show });
             },
 
             reset: () => {

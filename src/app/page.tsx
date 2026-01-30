@@ -16,7 +16,7 @@ const Viewer3D = dynamic(() => import('@/components/Viewer3D'), {
 });
 
 export default function Home() {
-  const { reset, activePanel, setActivePanel } = useAppStore();
+  const { reset } = useAppStore();
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 

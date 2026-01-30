@@ -42,7 +42,19 @@ export class UniversalGenerator extends BaseGenerator {
         const modifiers: string[] = Array.isArray(all.modifiers) ? all.modifiers : [];
         const features: string[] = Array.isArray(all.features) ? all.features : [];
 
-        // Create the premium geometry
+        // Check for Motor Mount features (Layer 2 Standards Injection)
+        const motorFeature = features.find(f => f.includes('NEMA'));
+
+        // If it's a plate/bracket with a motor mount
+        if (motorFeature && ['plate', 'bracket', 'mount', 'base', 'box'].includes(primitiveType)) {
+            const motorSpec = MechanicalStandards.getMotorSpec(motorFeature);
+            if (motorSpec) {
+                // Return fully formed GeneratedGeometry directly
+                return this.createMotorMountPlate(dims, 0.01, motorSpec, modifiers.includes('rounded') || dims.fillet > 0);
+            }
+        }
+
+        // Create the premium geometry (Standard path)
         const mesh = this.createPremiumGeometry(primitiveType, dims, modifiers, features);
 
         // Center the geometry
@@ -107,17 +119,6 @@ export class UniversalGenerator extends BaseGenerator {
         const scale = 0.01; // mm to meters
         const isHollow = modifiers.includes('hollow') || modifiers.includes('shell');
         const hasRounding = modifiers.includes('rounded') || modifiers.includes('filleted') || dims.fillet > 0;
-
-        // Check for Motor Mount features (Layer 2 Standards Injection)
-        const motorFeature = features.find(f => f.includes('NEMA'));
-
-        // If it's a plate/bracket with a motor mount
-        if (motorFeature && ['plate', 'bracket', 'mount', 'base', 'box'].includes(primitiveType)) {
-            const motorSpec = MechanicalStandards.getMotorSpec(motorFeature);
-            if (motorSpec) {
-                return this.createMotorMountPlate(dims, scale, motorSpec, hasRounding);
-            }
-        }
 
         switch (primitiveType) {
             case 'cylinder':
@@ -511,10 +512,10 @@ export class UniversalGenerator extends BaseGenerator {
         scale: number,
         motor: { boltSpacing: number; pilotDia: number; mountingHole: string },
         rounded: boolean
-    ): THREE.BufferGeometry {
+    ): GeneratedGeometry {
         const l = dims.length * scale;
         const w = dims.width * scale;
-        const h = dims.thickness * scale || 0.05; // Default 5mm
+        const h = dims.thickness * scale || 0.005; // Default 5mm (0.005m) if passed 0, usually dims.thickness is > 0
         const r = rounded ? Math.min(dims.fillet || 2, dims.length / 8) * scale : 0;
 
         // Base Plate
@@ -555,7 +556,23 @@ export class UniversalGenerator extends BaseGenerator {
 
         const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geometry.rotateX(-Math.PI / 2);
-        return geometry;
+        geometry.center();
+
+        const volume = (l * w * h) * 0.8; // Approx volume minus holes
+
+        return {
+            mesh: geometry,
+            dimensions: {
+                length: l / scale,
+                width: w / scale,
+                thickness: h / scale
+            },
+            metadata: {
+                volume_mm3: volume * 1000000000, // m3 to mm3
+                mass_g: volume * 2700 * 1000, // density * 1000 for g
+                features: ['NEMA Motor Mount', ...Object.values(motor).map(v => v.toString())]
+            }
+        };
     }
 
     private createSpinner(dims: Record<string, number>, scale: number): THREE.BufferGeometry {

@@ -13,6 +13,7 @@ export interface SimulationResult {
     thermal_perf: 'Low' | 'Medium' | 'High';
     stress_mpa?: number;
     failure_mode?: string;
+    heatmapData?: Float32Array; // Vertex colors [r, g, b, ...]
 }
 
 export function runMaterialSimulation(

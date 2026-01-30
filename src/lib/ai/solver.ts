@@ -23,28 +23,30 @@ export class EngineeringSolver {
      * @param material Material Name (default: Steel S235)
      * @param minSafetyFactor Target SF (default: 1.5)
      */
-    static solveComponent(
+    static async solveComponent(
         componentType: string,
         load_n: number,
         material: string = 'Steel S235',
         minSafetyFactor: number = 1.5
-    ): SolverResult {
+    ): Promise<SolverResult> {
         const log: string[] = [];
         log.push(`Starting Solver: Find ${componentType} for ${load_n}N load (Material: ${material}, Min SF: ${minSafetyFactor})`);
+
+        // Optimization: Yield to main thread to prevent UI freezing during intensive loops
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         if (componentType.toLowerCase() === 'bolt') {
             return this.solveBolt(load_n, material, minSafetyFactor, log);
         } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(componentType.toLowerCase())) {
             return this.solvePlate(load_n, material, minSafetyFactor, log);
         } else if (componentType.toLowerCase() === 'bearing') {
-            // Simplified bearing solver logic if needed
             return { recommendedSpec: 'Unknown', safetyFactor: 0, mass_g: 0, iterations: 0, log };
         }
 
         return { recommendedSpec: 'Unknown', safetyFactor: 0, mass_g: 0, iterations: 0, log };
     }
 
-    private static solvePlate(load_n: number, material: string, targetSF: number, log: string[]): SolverResult {
+    private static async solvePlate(load_n: number, material: string, targetSF: number, log: string[]): Promise<SolverResult> {
         // Iterate thickness for a standard bracket (assumed 100mm overhang/length)
         const TEST_LENGTH = 100; // mm
         const TEST_WIDTH = 50;   // mm
@@ -53,6 +55,9 @@ export class EngineeringSolver {
         // Try thickness 1mm to 25mm
         for (let t = 1; t <= 25; t += 1) {
             iterations++;
+
+            // Yield every 5 iterations to keep UI responsive
+            if (iterations % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
 
             // Run Simulation (Generic Beam/Plate)
             const params = {
@@ -89,7 +94,7 @@ export class EngineeringSolver {
         };
     }
 
-    private static solveBolt(load_n: number, material: string, targetSF: number, log: string[]): SolverResult {
+    private static async solveBolt(load_n: number, material: string, targetSF: number, log: string[]): Promise<SolverResult> {
         // Get all metric threads sorted by size
         const sizes = Object.keys(MechanicalStandards.METRIC_THREADS).sort((a, b) => {
             const sizeA = parseFloat(a.replace('M', ''));
@@ -101,6 +106,9 @@ export class EngineeringSolver {
 
         for (const size of sizes) {
             iterations++;
+            // Yield every few iterations
+            if (iterations % 3 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+
             // Run Simulation for this size
             const params = {
                 primitive_type: 'bolt',
