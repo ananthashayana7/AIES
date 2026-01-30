@@ -28,6 +28,15 @@ export interface BearingSpec {
     type: string;        // "Ball", "Roller", etc.
 }
 
+export interface NemaSpec {
+    designation: string; // e.g., "NEMA 17"
+    pilotDia: number;    // mm (centering boss)
+    boltCircle: number;  // mm (diagonal spacing usually? No, NEMA is usually square spacing)
+    boltSpacing: number; // mm (side length of square pattern)
+    mountingHole: string; // e.g. "M3" or "M4" (clearance)
+    shaftDia: number;    // mm
+}
+
 // ISO Metric Screw Threads (Coarse) - ISO 724 / DIN 13-1
 // Head dimensions based on ISO 4014 (Hex) and ISO 4762 (Socket)
 export const METRIC_THREADS: Record<string, ThreadSpec> = {
@@ -115,6 +124,34 @@ export const BEARINGS: Record<string, BearingSpec> = {
     '6203': { designation: '6203', innerDia: 17, outerDia: 40, width: 12, type: 'Ball' }
 };
 
+// NEMA Stepper Motor Standards
+export const NEMA_MOTORS: Record<string, NemaSpec> = {
+    'NEMA 17': {
+        designation: 'NEMA 17',
+        boltSpacing: 31, // mm (43.2mm diagonal approx)
+        boltCircle: 43.8, // not strictly used, we use spacing
+        pilotDia: 22,
+        mountingHole: 'M3',
+        shaftDia: 5
+    },
+    'NEMA 23': {
+        designation: 'NEMA 23',
+        boltSpacing: 47.14,
+        boltCircle: 66.6,
+        pilotDia: 38.1,
+        mountingHole: 'M5',
+        shaftDia: 6.35
+    },
+    'NEMA 34': {
+        designation: 'NEMA 34',
+        boltSpacing: 69.6,
+        boltCircle: 98.4,
+        pilotDia: 73,
+        mountingHole: 'M6',
+        shaftDia: 14 // varies but usually 12-14
+    }
+};
+
 export const MechanicalStandards = {
     // Get thread specification (handles "M10", "m10", "10", etc.)
     getThreadSpec: (size: string | number): ThreadSpec | null => {
@@ -154,8 +191,16 @@ export const MechanicalStandards = {
         return BEARINGS[designation] || null;
     },
 
+    getMotorSpec: (designation: string): NemaSpec | null => {
+        // Handle "NEMA 17", "Nema17", "17" if context implies motor
+        const clean = designation.toUpperCase().replace('NEMA', '').trim();
+        const key = `NEMA ${clean}`;
+        return NEMA_MOTORS[key] || null;
+    },
+
     BEARINGS,
-    METRIC_THREADS
+    METRIC_THREADS,
+    NEMA_MOTORS
 };
 
 export default MechanicalStandards;

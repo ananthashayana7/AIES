@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { BaseGenerator, GeometrySpec, GeneratedGeometry } from './BaseGenerator';
+import MechanicalStandards from '../../standards/mechanical';
 
 // Quality settings for premium output
 const QUALITY = {
@@ -106,6 +107,17 @@ export class UniversalGenerator extends BaseGenerator {
         const scale = 0.01; // mm to meters
         const isHollow = modifiers.includes('hollow') || modifiers.includes('shell');
         const hasRounding = modifiers.includes('rounded') || modifiers.includes('filleted') || dims.fillet > 0;
+
+        // Check for Motor Mount features (Layer 2 Standards Injection)
+        const motorFeature = features.find(f => f.includes('NEMA'));
+
+        // If it's a plate/bracket with a motor mount
+        if (motorFeature && ['plate', 'bracket', 'mount', 'base', 'box'].includes(primitiveType)) {
+            const motorSpec = MechanicalStandards.getMotorSpec(motorFeature);
+            if (motorSpec) {
+                return this.createMotorMountPlate(dims, scale, motorSpec, hasRounding);
+            }
+        }
 
         switch (primitiveType) {
             case 'cylinder':
@@ -492,6 +504,58 @@ export class UniversalGenerator extends BaseGenerator {
             default:
                 return dims.length * dims.width * dims.height;
         }
+    }
+
+    private createMotorMountPlate(
+        dims: Record<string, number>,
+        scale: number,
+        motor: { boltSpacing: number; pilotDia: number; mountingHole: string },
+        rounded: boolean
+    ): THREE.BufferGeometry {
+        const l = dims.length * scale;
+        const w = dims.width * scale;
+        const h = dims.thickness * scale || 0.05; // Default 5mm
+        const r = rounded ? Math.min(dims.fillet || 2, dims.length / 8) * scale : 0;
+
+        // Base Plate
+        const shape = rounded
+            ? this.createRoundedRectShape(l, w, r)
+            : this.createRectShape(l, w);
+
+        // Center Pilot Hole
+        const pilotR = (motor.pilotDia / 2) * scale;
+        const pilotHole = new THREE.Path();
+        pilotHole.absarc(0, 0, pilotR, 0, Math.PI * 2, true);
+        shape.holes.push(pilotHole);
+
+        // Mounting Holes (4 corners)
+        const spacing = (motor.boltSpacing / 2) * scale;
+        // Parse M3/M4 from string or default to 3mm
+        const screwSize = parseFloat(motor.mountingHole.replace('M', '')) || 3;
+        const holeR = (screwSize / 2) * scale * 1.1; // +10% clearance
+
+        const corners = [
+            { x: spacing, y: spacing },
+            { x: -spacing, y: spacing },
+            { x: spacing, y: -spacing },
+            { x: -spacing, y: -spacing }
+        ];
+
+        corners.forEach(c => {
+            const screwHole = new THREE.Path();
+            screwHole.absarc(c.x, c.y, holeR, 0, Math.PI * 2, true);
+            shape.holes.push(screwHole);
+        });
+
+        const extrudeSettings = {
+            depth: h,
+            bevelEnabled: false,
+            curveSegments: QUALITY.CURVE_SEGMENTS
+        };
+
+        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        geometry.rotateX(-Math.PI / 2);
+        return geometry;
     }
 
     private createSpinner(dims: Record<string, number>, scale: number): THREE.BufferGeometry {
