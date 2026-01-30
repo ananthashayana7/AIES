@@ -10,30 +10,30 @@
 ##  Key Features
 
 ### AI-Driven Design
-- **Natural Language Input**: Describe your part (e.g., *"Fidget spinner with 3 arms"* or *"Mounting bracket 150x80mm"*) and Cadence generates the specs.
+- **Natural Language Input**: Describe your part and Cadence generates the specs.
 - **Rule Engine**: Deterministic checks for manufacturing constraints (wall thickness, hole spacing, mass limits).
 - **Risk Assessment**: Real-time evaluation of structural, manufacturing, and tolerance risks.
 
-### 📐 Dynamic Parametric Modeling
+###  Dynamic Parametric Modeling
 - **Live 3D Preview**: Interactive WebGL viewer (Three.js) that updates instantly.
 - **Part Types**: Specialized generators for:
-  - 🔩 Brackets
-  - 📦 Enclosures
-  - 🔧 Shafts
-  - ⚙️ Gears
-  - 🔃 Spinners (Custom)
+  -  Brackets
+  -  Enclosures
+  -  Shafts
+  -  Gears
+  -  Spinners (Custom)
 - **Inspect Mode**: Click on any part region (body, holes, pockets) to view engineering data.
 
 ### 🏭 Manufacturing Ready
 - **Procedure Generation**: Automatic generation of standard operating procedures (SOPs) based on feature analysis.
 - **Export**:
-  - 📄 **PDF Reports**: Comprehensive DFM reports with risk analysis.
-  - 🧊 **GLB Models**: Export 3D binary files for use in CAD/Blender.
-  - 📋 **JSON Specs**: Machine-readable design intent files.
+  -  **PDF Reports**: Comprehensive DFM reports with risk analysis.
+  -  **GLB Models**: Export 3D binary files for use in CAD/Blender.
+  -  **JSON Specs**: Machine-readable design intent files.
 
 ---
 
-## 🛠️ Installation & Running
+##  Installation & Running
 
 ### Prerequisites
 - Node.js 18+
