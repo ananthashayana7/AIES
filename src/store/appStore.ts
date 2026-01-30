@@ -112,15 +112,23 @@ export const useAppStore = create<AppState>()(
                 const type = designIntent.parameters.primitive_type;
                 const mat = designIntent.materials[0] || 'Steel S235';
 
-                if (load && type === 'bolt') {
-                    const result = EngineeringSolver.solveComponent('bolt', load, mat);
+                if (load) {
+                    // Dispatch to generalized solver (handles bolts, plates, brackets)
+                    const result = EngineeringSolver.solveComponent(type, load, mat);
 
                     if (result.recommendedSpec !== 'None') {
                         // Apply the recommendation
                         const newIntent = { ...designIntent };
-                        newIntent.parameters.thread = result.recommendedSpec;
-                        // Clear manual dims to let generator use standard
-                        // But we might want to keep length
+
+                        if (type === 'bolt') {
+                            newIntent.parameters.thread = result.recommendedSpec;
+                        } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(type)) {
+                            // Extract thickness from "5mm Plate"
+                            const thickMatch = result.recommendedSpec.match(/(\d+)mm/);
+                            if (thickMatch) {
+                                newIntent.parameters.thickness_mm = parseFloat(thickMatch[1]);
+                            }
+                        }
 
                         set({
                             designIntent: newIntent,

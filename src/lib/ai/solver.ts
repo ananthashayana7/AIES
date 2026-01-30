@@ -34,12 +34,59 @@ export class EngineeringSolver {
 
         if (componentType.toLowerCase() === 'bolt') {
             return this.solveBolt(load_n, material, minSafetyFactor, log);
+        } else if (['plate', 'bracket', 'mount', 'base', 'box'].includes(componentType.toLowerCase())) {
+            return this.solvePlate(load_n, material, minSafetyFactor, log);
         } else if (componentType.toLowerCase() === 'bearing') {
             // Simplified bearing solver logic if needed
             return { recommendedSpec: 'Unknown', safetyFactor: 0, mass_g: 0, iterations: 0, log };
         }
 
         return { recommendedSpec: 'Unknown', safetyFactor: 0, mass_g: 0, iterations: 0, log };
+    }
+
+    private static solvePlate(load_n: number, material: string, targetSF: number, log: string[]): SolverResult {
+        // Iterate thickness for a standard bracket (assumed 100mm overhang/length)
+        const TEST_LENGTH = 100; // mm
+        const TEST_WIDTH = 50;   // mm
+        let iterations = 0;
+
+        // Try thickness 1mm to 25mm
+        for (let t = 1; t <= 25; t += 1) {
+            iterations++;
+
+            // Run Simulation (Generic Beam/Plate)
+            const params = {
+                primitive_type: 'plate',
+                length_mm: TEST_LENGTH,
+                width_mm: TEST_WIDTH,
+                thickness_mm: t,
+                force_kn: load_n / 1000
+            };
+
+            const result = runMaterialSimulation(params, [material])[0];
+
+            log.push(`Iteration ${iterations}: Testing ${t}mm -> Stress: ${result.stress_mpa} MPa, SF: ${result.safetyFactor}`);
+
+            if (result.safetyFactor >= targetSF) {
+                log.push(`✅ Solution Found: ${t}mm thickness passes with SF ${result.safetyFactor}`);
+                return {
+                    recommendedSpec: `${t}mm Plate`,
+                    safetyFactor: result.safetyFactor,
+                    mass_g: result.mass_g,
+                    iterations,
+                    log
+                };
+            }
+        }
+
+        log.push("❌ Could not solve within thickness limits (25mm). Material too weak?");
+        return {
+            recommendedSpec: 'None',
+            safetyFactor: 0,
+            mass_g: 0,
+            iterations,
+            log
+        };
     }
 
     private static solveBolt(load_n: number, material: string, targetSF: number, log: string[]): SolverResult {

@@ -87,6 +87,8 @@ export class EngineeringAgent {
                 intentUpdate: {
                     parameters: {
                         ...currentIntent.parameters,
+                        // Ensure primitive type is set if detected (e.g. "bracket") so solver knows what to solve
+                        primitive_type: parsed.primitiveType !== 'box' ? parsed.primitiveType : (currentIntent.parameters.primitive_type || 'plate'),
                         context: {
                             ...(currentIntent.parameters.context || {}),
                             load: parsed.context.load
