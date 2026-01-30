@@ -68,6 +68,8 @@ export default function AgentChat() {
                 useAppStore.getState().setHeatmap(true);
             } else if (response.action === 'trigger_export') {
                 window.dispatchEvent(new CustomEvent('EXPORT_STL_REQUESTED', { detail: { filename: designIntent?.part_id || 'design' } }));
+            } else if (response.action === 'trigger_export_gltf') {
+                window.dispatchEvent(new CustomEvent('EXPORT_GLTF_REQUESTED', { detail: { filename: designIntent?.part_id || 'design' } }));
             } else if (response.intentUpdate) {
                 generateGuidance(); // Refresh geometry for any param change
             }

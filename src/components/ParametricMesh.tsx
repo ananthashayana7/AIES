@@ -354,13 +354,22 @@ export default function ParametricMesh({ variant, intent, inspectMode, onClick }
 
     // Export Listener
     useEffect(() => {
-        const handleExport = (e: any) => {
+        const handleExportSTL = (e: any) => {
             if (meshRef.current) {
                 ExportManager.downloadSTL(meshRef.current, e.detail?.filename || 'design');
             }
         };
-        window.addEventListener('EXPORT_STL_REQUESTED', handleExport);
-        return () => window.removeEventListener('EXPORT_STL_REQUESTED', handleExport);
+        const handleExportGLTF = (e: any) => {
+            if (meshRef.current) {
+                ExportManager.downloadGLTF(meshRef.current, e.detail?.filename || 'design');
+            }
+        };
+        window.addEventListener('EXPORT_STL_REQUESTED', handleExportSTL);
+        window.addEventListener('EXPORT_GLTF_REQUESTED', handleExportGLTF);
+        return () => {
+            window.removeEventListener('EXPORT_STL_REQUESTED', handleExportSTL);
+            window.removeEventListener('EXPORT_GLTF_REQUESTED', handleExportGLTF);
+        };
     }, [geometry]);
 
     // Render Logic for Assemblies (Groups)

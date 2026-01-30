@@ -5,6 +5,7 @@
 import { DesignIntent } from '../schemas/designIntent';
 import { parseDesignDescription } from '../nlp/designParser';
 import { MATERIAL_LIBRARY } from '../simulation/materialLibrary';
+import { CostEngine } from '../simulation/costEngine';
 
 export interface AgentMessage {
     role: 'user' | 'assistant';
@@ -15,7 +16,7 @@ export interface AgentMessage {
 export interface AgentResponse {
     text: string;
     intentUpdate?: Partial<DesignIntent>;
-    action?: 'trigger_solver' | 'trigger_simulation' | 'show_heatmap' | 'trigger_export';
+    action?: 'trigger_solver' | 'trigger_simulation' | 'show_heatmap' | 'trigger_export' | 'trigger_export_gltf';
 }
 
 export class EngineeringAgent {
@@ -99,7 +100,30 @@ export class EngineeringAgent {
             };
         }
 
-        // 4. Check for Export Intents
+        // 4. Check for Cost/Price Intents
+        if (lower.includes('cost') || lower.includes('price') || lower.includes('how much')) {
+            // Rough volume estimation if not available (default box)
+            const l = parseFloat(currentIntent.parameters.length_mm?.toString() || '100');
+            const w = parseFloat(currentIntent.parameters.width_mm?.toString() || '100');
+            const h = parseFloat(currentIntent.parameters.thickness_mm?.toString() || '10');
+            const vol = l * w * h;
+            const matName = currentIntent.materials[0] || 'Aluminum 6061-T6';
+
+            const costCNC = CostEngine.calculateCost(vol, matName, 'CNC');
+
+            return {
+                text: `Estimated Manufacturing Cost (${matName}): $${costCNC.totalCost} (CNC).\nBreakdown: Material $${costCNC.materialCost}, Machining $${costCNC.machiningCost}.`
+            };
+        }
+
+        // 5. Check for Export Intents
+        if (lower.includes('gltf') || lower.includes('glb')) {
+            return {
+                text: "Exporting GLTF 3D Model...",
+                action: 'trigger_export_gltf'
+            };
+        }
+
         if (lower.includes('export') || lower.includes('download') || lower.includes('save') || lower.includes('stl')) {
             return {
                 text: "Generating STL file for manufacturing...",
@@ -107,7 +131,7 @@ export class EngineeringAgent {
             };
         }
 
-        // 5. Check for Visualization Intents
+        // 6. Check for Visualization Intents
         if (lower.includes('show stress') || lower.includes('show heatmap') || lower.includes('fem')) {
             return {
                 text: "Activating real-time stress visualization (FEM). Red areas indicate peak stress.",
@@ -115,7 +139,7 @@ export class EngineeringAgent {
             };
         }
 
-        // 6. Check for New Design (Reset)
+        // 7. Check for New Design (Reset)
         if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a")) {
             // Full re-parse
             const newParams: Record<string, any> = { ...parsed.dimensions, ...parsed.context, primitive_type: parsed.primitiveType };
