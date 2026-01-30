@@ -139,9 +139,32 @@ export class EngineeringAgent {
             };
         }
 
-        // 7. Check for New Design (Reset)
-        if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a")) {
-            // Full re-parse
+        // 7. Check for New Design (Interrogative Logic)
+        if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a") || lower === "bolt" || lower === "bracket") {
+
+            // Interrogation: Bolt
+            if (parsed.primitiveType === 'bolt' && !parsed.standardSpec) {
+                // If they didn't specify M-size (e.g. "Design a bolt")
+                return {
+                    text: "What size bolt do you need? (e.g., M6, M10, M12)"
+                };
+            }
+
+            // Interrogation: Bracket/Plate Load
+            if (['plate', 'bracket', 'mount', 'base', 'box'].includes(parsed.primitiveType) && !parsed.context.load) {
+                // Return partial design but ask for load to enable Solver
+                const newParams: Record<string, any> = { ...parsed.dimensions, ...parsed.context, primitive_type: parsed.primitiveType };
+                return {
+                    text: `I've initialized a generic ${parsed.profile}. To engineer the thickness correctly, I need to know the load. How much weight must it hold? (e.g., 5kg, 100N)`,
+                    intentUpdate: {
+                        part_id: `GEN-${Date.now().toString().slice(-4)}`,
+                        materials: [parsed.material],
+                        parameters: newParams
+                    }
+                };
+            }
+
+            // Full re-parse (Success)
             const newParams: Record<string, any> = { ...parsed.dimensions, ...parsed.context, primitive_type: parsed.primitiveType };
             if (parsed.standardSpec) newParams['thread'] = parsed.standardSpec;
 
