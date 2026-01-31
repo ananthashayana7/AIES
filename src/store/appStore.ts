@@ -8,6 +8,7 @@ import { DesignIntent, exampleDesignIntent } from '../lib/schemas/designIntent';
 import { GeneratedVariant, generateVariants } from '../lib/variants/variantGenerator';
 
 import { SimulationResult, runMaterialSimulation } from '../lib/simulation/simulationEngine';
+import { ManufacturingEngine } from '../lib/simulation/manufacturingEngine';
 import { EngineeringSolver, SolverResult } from '../lib/ai/solver';
 import { AIReasoning } from '../lib/schemas/aiReasoning';
 import { analyzeDesign } from '../lib/ai/aiReasoner';
@@ -27,6 +28,9 @@ interface AppState {
     // Material Simulation Results (Phase 10)
     simulationResults: SimulationResult[];
 
+    // Manufacturing Plan (The Pro Feature)
+    manufacturingPlan: any | null; // Typed loosely to avoid circular deps for now
+
     // SRS F5: AI Reasoning & Insights
     aiReasoning: AIReasoning | null;
 
@@ -44,7 +48,7 @@ interface AppState {
     isProcessing: boolean;
     showJsonEditor: boolean;
     showHeatmap: boolean; // Visual FEM toggle
-    activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation';
+    activePanel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation' | 'manufacturing';
 
     // Actions
     setDesignIntent: (intent: DesignIntent) => void;
@@ -57,7 +61,7 @@ interface AppState {
     rejectSuggestion: (id: string, reason?: string) => void;
     reviewSuggestion: (id: string, decision: 'accepted' | 'rejected') => void;
     selectVariant: (id: string) => void;
-    setActivePanel: (panel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation') => void;
+    setActivePanel: (panel: 'intent' | 'insights' | 'guidance' | 'audit' | 'simulation' | 'manufacturing') => void;
     toggleJsonEditor: () => void;
     setHeatmap: (show: boolean) => void;
     reset: () => void;
@@ -82,6 +86,7 @@ export const useAppStore = create<AppState>()(
             variants: [],
             selectedVariantId: null,
             simulationResults: [],
+            manufacturingPlan: null,
             aiReasoning: null,
             ruleCheckResult: null,
             reviewDecisions: {},
@@ -98,6 +103,7 @@ export const useAppStore = create<AppState>()(
                     variants: [],
                     selectedVariantId: null,
                     simulationResults: [],
+                    manufacturingPlan: null,
                     aiReasoning: null,
                     ruleCheckResult: null
                 });
@@ -164,9 +170,13 @@ export const useAppStore = create<AppState>()(
                 // Simulate SRS NFR performance targets (≤ 5s)
                 setTimeout(() => {
                     const variants = generateVariants(designIntent);
+                    // Generate SOP
+                    const sop = ManufacturingEngine.generateSOP(designIntent);
+
                     set({
                         variants,
                         selectedVariantId: variants[0]?.id || null,
+                        manufacturingPlan: sop,
                         isProcessing: false,
                         activePanel: 'guidance',
                     });

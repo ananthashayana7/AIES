@@ -79,7 +79,26 @@ export class EngineeringAgent {
             };
         }
 
-        // 3. Check for Context/Load Updates (Trigger Solver)
+        // 3. Cost Reduction Intents
+        if (lower.includes("cheaper") || lower.includes("reduce cost") || lower.includes("too expensive")) {
+            // Suggest cheaper material
+            const currentMat = currentIntent.materials[0];
+            let newMat = "Steel S235"; // Default cheap option
+
+            if (currentMat.includes("Titanium")) newMat = "Aluminum 6061-T6";
+            if (currentMat.includes("Aluminum")) newMat = "Steel S235";
+            if (currentMat.includes("Carbon")) newMat = "Aluminum 6061-T6";
+
+            return {
+                text: `To reduce cost, I recommend switching from ${currentMat} to ${newMat}. This material is significantly more affordable while maintaining good structural properties.`,
+                intentUpdate: {
+                    materials: [newMat]
+                },
+                action: 'trigger_simulation'
+            };
+        }
+
+        // 4. Check for Context/Load Updates (Trigger Solver)
         // "Load is 10kN", "Hold 500kg"
         const parsed = parseDesignDescription(input);
         if (parsed.context.load) {
