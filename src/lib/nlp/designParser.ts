@@ -822,8 +822,8 @@ function extractLoad(text: string): number | undefined {
     }
 
     // Detect Mass (as Load) -> "hold 5kg" -> ~50N
-    // Support variations like "holding", "supporting", "carrying"
-    const massMatch = text.match(/(?:hold|support|carry|load)[a-z]*\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(kg|g|lbs)\b/i);
+    // Support variations like "holding", "supporting", "carrying", "for a 50kg load"
+    const massMatch = text.match(/(?:hold|support|carry|load|capacity|weight|for\s+a)[a-z]*\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(kg|g|lbs)\b/i);
     if (massMatch) {
         const val = parseFloat(massMatch[1]);
         const unit = massMatch[2].toLowerCase();
