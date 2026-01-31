@@ -518,6 +518,8 @@ import { ExportManager } from '@/lib/export/ExportManager';
 
 function AuditTab({ variant }: { variant: any }) {
     const intent = useAppStore(state => state.designIntent);
+    const solverResult = useAppStore(state => state.solverResult);
+    const plan = useAppStore(state => state.manufacturingPlan);
 
     const handleExportPDF = () => {
         if (intent && variant) {
@@ -525,12 +527,47 @@ function AuditTab({ variant }: { variant: any }) {
         }
     };
 
+    // Calculate Audit Status
+    const checks = [
+        {
+            label: 'STANDARDS COMPLIANCE',
+            status: (intent?.parameters.thread || intent?.parameters.features?.some((f: string) => f.includes('NEMA'))) ? 'PASS' : 'WARN',
+            detail: (intent?.parameters.thread || intent?.parameters.features?.some((f: string) => f.includes('NEMA')))
+                ? 'Standard Component Detected' : 'Custom Geometry (No Standard Detected)'
+        },
+        {
+            label: 'STRUCTURAL INTEGRITY',
+            status: (solverResult?.safetyFactor || 0) >= (intent?.acceptance?.safety_factor_min || 1.5) ? 'PASS' : 'FAIL',
+            detail: `Safety Factor: ${(solverResult?.safetyFactor || 0).toFixed(2)} (Min: ${intent?.acceptance?.safety_factor_min || 1.5})`
+        },
+        {
+            label: 'MANUFACTURABILITY',
+            status: plan ? 'PASS' : 'PENDING',
+            detail: plan ? `Verified: ${plan.steps.length} Operations` : 'Generate Design to Verify'
+        }
+    ];
+
+    const allPass = checks.every(c => c.status === 'PASS');
+
     return (
         <div className="audit-tab">
-            <div className="section">
-                <h3>REVIEW STATUS</h3>
-                <p className="placeholder">Human-in-the-loop audit trail.</p>
+            <div className={`audit-summary ${allPass ? 'pass' : 'warn'}`}>
+                <h3>SYSTEM AUDIT</h3>
+                <div className="checks">
+                    {checks.map((check, i) => (
+                        <div key={i} className="check-item">
+                            <div className="check-header">
+                                <span className="label">{check.label}</span>
+                                <span className={`status ${check.status}`}>{check.status}</span>
+                            </div>
+                            <p className="detail">{check.detail}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
+            <div className="section">
+                <h3>DELIVERABLES</h3>
                 <div className="actions">
                     <button className="export-btn" onClick={handleExportPDF}>
                         📄 DOWNLOAD DFM REPORT (PDF)
@@ -539,24 +576,44 @@ function AuditTab({ variant }: { variant: any }) {
             </div>
 
             <style jsx>{`
+                .audit-tab { display: flex; flex-direction: column; gap: 20px; font-family: var(--font-mono); }
+
+                .audit-summary { border: 1px solid #333; padding: 16px; background: #000; }
+                .audit-summary.pass { border-color: #00cc66; }
+                .audit-summary.warn { border-color: #ffaa00; }
+
+                .audit-summary h3 { color: #fff; font-size: 12px; margin: 0 0 16px 0; letter-spacing: 1px; }
+
+                .checks { display: flex; flex-direction: column; gap: 12px; }
+                .check-item { display: flex; flex-direction: column; gap: 4px; }
+
+                .check-header { display: flex; justify-content: space-between; align-items: center; }
+                .label { font-size: 10px; color: #ccc; font-weight: 700; }
+
+                .status { font-size: 10px; font-weight: 800; padding: 2px 6px; }
+                .status.PASS { background: #00cc66; color: #000; }
+                .status.WARN { background: #ffaa00; color: #000; }
+                .status.FAIL { background: #ff5555; color: #000; }
+                .status.PENDING { background: #333; color: #888; }
+
+                .detail { font-size: 9px; color: #666; margin: 0; }
+
+                .section { border: 1px solid #1a1a1a; padding: 16px; background: #000; }
+                .section h3 { font-size: 11px; margin: 0 0 12px 0; letter-spacing: 1px; color: #666; }
+
                 .export-btn {
                     width: 100%;
                     background: #fff;
                     color: #000;
                     border: none;
-                    padding: 8px;
+                    padding: 12px;
                     font-size: 10px;
                     font-weight: 800;
                     cursor: pointer;
-                    margin-top: 12px;
+                    margin-top: 0;
                 }
                 .export-btn:hover { background: #eee; }
-        .audit-tab { display: flex; flex-direction: column; gap: 20px; }
-        .section { border: 1px solid #1a1a1a; padding: 16px; background: #000; }
-        .section h3 { font-size: 11px; margin: 0 0 12px 0; letter-spacing: 1px; color: #666; }
-        .placeholder { font-size: 10px; color: #888; margin: 0 0 8px 0; }
-        .note { font-size: 9px; color: #444; margin: 0; }
-      `}</style>
+            `}</style>
         </div>
     );
 }
