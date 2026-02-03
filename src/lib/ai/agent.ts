@@ -161,6 +161,16 @@ export class EngineeringAgent {
         // 7. Check for New Design (Interrogative Logic)
         if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a") || lower === "bolt" || lower === "bracket") {
 
+            // Check for Scope/Complexity Violations (Aircraft Engine, Car, etc.)
+            const complexAssemblies = ['engine', 'car', 'airplane', 'robot', 'drone', 'vehicle', 'machine'];
+            const requestedAssembly = complexAssemblies.find(c => lower.includes(c));
+
+            if (requestedAssembly) {
+                return {
+                    text: `I specialize in component-level engineering. I cannot design an entire ${requestedAssembly} at once, but I can help you engineer specific parts like the *Turbine Shaft*, *Mounting Brackets*, or *Bolts*. What specific component should we start with?`
+                };
+            }
+
             // Interrogation: Bolt
             if (parsed.primitiveType === 'bolt' && !parsed.standardSpec) {
                 // If they didn't specify M-size (e.g. "Design a bolt")
