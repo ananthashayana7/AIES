@@ -96,17 +96,22 @@ export class UniversalGenerator extends BaseGenerator {
 
         const def = defaults[primitiveType] || defaults.box;
 
+        const safeVal = (val: any, fallback: number) => {
+             const num = this.extractUnit(val);
+             return (isNaN(num) || num <= 0) ? fallback : num;
+        };
+
         return {
-            length: this.extractUnit(params.length_mm || params.length || def.length || 100),
-            width: this.extractUnit(params.width_mm || params.width || def.width || 100),
-            height: this.extractUnit(params.height_mm || params.height || def.height || 20),
-            thickness: this.extractUnit(params.thickness_mm || params.wall_thickness_mm || params.thickness || def.thickness || 2),
-            diameter: this.extractUnit(params.diameter_mm || params.diameter || def.diameter || 50),
-            radius: this.extractUnit(params.radius_mm || params.radius || (params.diameter_mm || def.diameter || 50) / 2),
-            fillet: this.extractUnit(params.fillet_radius || params.fillet || def.fillet || 0),
-            chamfer: this.extractUnit(params.chamfer_size || params.chamfer || 0),
-            tubeRadius: this.extractUnit(params.tube_radius || def.tubeRadius || 10),
-            topDiameter: this.extractUnit(params.top_diameter || def.topDiameter || 0),
+            length: safeVal(params.length_mm || params.length, def.length || 100),
+            width: safeVal(params.width_mm || params.width, def.width || 100),
+            height: safeVal(params.height_mm || params.height, def.height || 20),
+            thickness: safeVal(params.thickness_mm || params.wall_thickness_mm || params.thickness, def.thickness || 2),
+            diameter: safeVal(params.diameter_mm || params.diameter, def.diameter || 50),
+            radius: safeVal(params.radius_mm || params.radius, (def.diameter || 50) / 2),
+            fillet: Math.abs(this.extractUnit(params.fillet_radius || params.fillet || def.fillet || 0)),
+            chamfer: Math.abs(this.extractUnit(params.chamfer_size || params.chamfer || 0)),
+            tubeRadius: safeVal(params.tube_radius, def.tubeRadius || 10),
+            topDiameter: Math.abs(this.extractUnit(params.top_diameter || def.topDiameter || 0)),
         };
     }
 
