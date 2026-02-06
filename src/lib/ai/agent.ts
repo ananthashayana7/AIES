@@ -159,7 +159,7 @@ export class EngineeringAgent {
         }
 
         // 7. Check for New Design (Interrogative Logic)
-        if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a") || lower === "bolt" || lower === "bracket") {
+        if (lower.startsWith("design a") || lower.startsWith("i need a") || lower.startsWith("create a") || lower === "bolt" || lower === "bracket" || (parsed.confidence >= 0.6 && parsed.profile !== 'Custom')) {
 
             // Check for Scope/Complexity Violations (Aircraft Engine, Car, etc.)
             const complexAssemblies = ['engine', 'car', 'airplane', 'robot', 'drone', 'vehicle', 'machine'];
