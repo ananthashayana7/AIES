@@ -197,8 +197,27 @@ export class EngineeringAgent {
             const newParams: Record<string, any> = { ...parsed.dimensions, ...parsed.context, primitive_type: parsed.primitiveType };
             if (parsed.standardSpec) newParams['thread'] = parsed.standardSpec;
 
+            // Engineering Reasoning & Volume Logic
+            let reasoning = "";
+
+            // 1. Volume Calculation (Bottle/Tank)
+            if (parsed.dimensions.volume) {
+                // Dimensions were derived in Parser if not explicit
+                const d = Math.round(parsed.dimensions.diameter || newParams.diameter_mm || 0);
+                const h = Math.round(parsed.dimensions.height || newParams.height_mm || 0);
+                reasoning += ` Calculated dimensions (~${d}x${h}mm) to hold ${parsed.dimensions.volume}ml volume.`;
+            }
+
+            // 2. Material Reasoning
+            if (parsed.material.includes("Aluminum")) reasoning += " Selected Aluminum for high strength-to-weight ratio.";
+            if (parsed.material.includes("Steel")) reasoning += " Selected Steel for maximum durability and yield strength.";
+            if (parsed.material.includes("Plastic") || parsed.material.includes("ABS")) reasoning += " Selected Plastic for lightweight and cost efficiency.";
+
+            // 3. Standard Reasoning
+            if (parsed.standardSpec) reasoning += ` Applied ${parsed.standardSpec} engineering standard.`;
+
             return {
-                text: `Starting new design: ${parsed.profile}.`,
+                text: `Starting new design: ${parsed.profile}.${reasoning}`,
                 intentUpdate: {
                     part_id: `GEN-${Date.now().toString().slice(-4)}`,
                     materials: [parsed.material],

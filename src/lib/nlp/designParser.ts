@@ -678,6 +678,15 @@ function extractDimensions(text: string, primitive: string): Record<string, numb
         { pattern: /(\d+(?:\.\d+)?)\s*(mm|cm)?\s*chamfer/i, dimension: 'chamfer' },
     ];
 
+    // Volume pattern
+    const volMatch = text.match(/(\d+(?:\.\d+)?)\s*(ml|l|liter|liters)/i);
+    if (volMatch) {
+        let vol = parseFloat(volMatch[1]);
+        const unit = volMatch[2].toLowerCase();
+        if (unit.startsWith('l')) vol *= 1000; // Convert to ml
+        dims.volume = vol;
+    }
+
     for (const { pattern, dimension } of patterns) {
         const match = text.match(pattern);
         if (match && !dims[dimension]) {
@@ -718,6 +727,25 @@ function extractDimensions(text: string, primitive: string): Record<string, numb
 }
 
 function applySmartDefaults(dims: Record<string, number>, primitive: string): Record<string, number> {
+    // If volume is present, derive dimensions before defaults
+    if (dims.volume && !dims.diameter && !dims.height && !dims.length && !dims.width) {
+        if (['cylinder', 'bottle', 'can', 'tank'].includes(primitive)) {
+            // V = Pi * r^2 * h. Assume h = 3d = 6r
+            // r = cuberoot(V / 6Pi)
+            // V in ml (cm^3) -> r in cm -> *10 for mm
+            const r_cm = Math.pow(dims.volume / (6 * Math.PI), 1/3);
+            dims.diameter = r_cm * 2 * 10;
+            dims.height = dims.diameter * 3;
+            dims.radius = dims.diameter / 2;
+        } else if (['box', 'cube'].includes(primitive)) {
+            // V = l * w * h. Assume cube for simplicity or golden ratio? Cube: s = cuberoot(V)
+            const s_cm = Math.pow(dims.volume, 1/3);
+            dims.length = s_cm * 10;
+            dims.width = s_cm * 10;
+            dims.height = s_cm * 10;
+        }
+    }
+
     const defaults: Record<string, Record<string, number>> = {
         box: { length: 100, width: 100, height: 20, thickness: 2, fillet: 0 },
         enclosure: { length: 100, width: 60, height: 40, thickness: 2, fillet: 3 },
