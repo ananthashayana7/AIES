@@ -9,34 +9,6 @@
 ## 🧠 The "Thinking Pipeline" (Architecture)
 
 Cadence operates on a 6-layer architecture designed to mimic a human engineer's workflow:
-=======
-##  Key Features
-
-### AI-Driven Design
-- **Natural Language Input**: Describe your part and Cadence generates the specs.
-- **Rule Engine**: Deterministic checks for manufacturing constraints (wall thickness, hole spacing, mass limits).
-- **Risk Assessment**: Real-time evaluation of structural, manufacturing, and tolerance risks.
-
-###  Dynamic Parametric Modeling
-- **Live 3D Preview**: Interactive WebGL viewer (Three.js) that updates instantly.
-- **Part Types**: Specialized generators for:
-  -  Brackets
-  -  Enclosures
-  -  Shafts
-  -  Gears
-  -  Spinners (Custom)
-- **Inspect Mode**: Click on any part region (body, holes, pockets) to view engineering data.
-
-### 🏭 Manufacturing Ready
-- **Procedure Generation**: Automatic generation of standard operating procedures (SOPs) based on feature analysis.
-- **Export**:
-  -  **PDF Reports**: Comprehensive DFM reports with risk analysis.
-  -  **GLB Models**: Export 3D binary files for use in CAD/Blender.
-  -  **JSON Specs**: Machine-readable design intent files.
-
----
-
-##  Installation & Running
 
 ### 1. The Configurator (NLP & Agent)
 - **Interrogative Logic**: The Agent actively asks for missing information (e.g., *"What is the load?"* or *"What size bolt?"*).

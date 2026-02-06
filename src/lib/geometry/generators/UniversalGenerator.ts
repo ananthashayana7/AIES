@@ -126,8 +126,12 @@ export class UniversalGenerator extends BaseGenerator {
         const hasRounding = modifiers.includes('rounded') || modifiers.includes('filleted') || dims.fillet > 0;
 
         switch (primitiveType) {
-            case 'cylinder':
             case 'bottle':
+            case 'flask':
+            case 'vial':
+                return this.createBottle(dims, scale);
+
+            case 'cylinder':
             case 'can':
             case 'tube':
             case 'pipe':
@@ -640,6 +644,50 @@ export class UniversalGenerator extends BaseGenerator {
 
         const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geometry.rotateX(-Math.PI / 2);
+        return geometry;
+    }
+
+    private createBottle(dims: Record<string, number>, scale: number): THREE.BufferGeometry {
+        const R = (dims.diameter / 2) * scale;
+        const H = dims.height * scale;
+        const neckR = R * 0.4;
+        const shoulderStart = H * 0.7;
+        const neckStart = H * 0.85;
+
+        // Define profile points (Solid of Revolution)
+        const points: THREE.Vector2[] = [];
+
+        // 1. Center Bottom
+        points.push(new THREE.Vector2(0, 0));
+        // 2. Base Edge
+        points.push(new THREE.Vector2(R, 0));
+        // 3. Shoulder Start (Vertical body)
+        points.push(new THREE.Vector2(R, shoulderStart));
+        // 4. Neck Start (Taper/Curve)
+        // Add a control point for smoothness if using Spline, but Lathe uses linear segments by default.
+        // Let's just do linear taper for "Engineering Bottle" (simplistic)
+        // Or adding intermediate point for rounded shoulder
+        points.push(new THREE.Vector2(R * 0.9, shoulderStart + (neckStart - shoulderStart) * 0.5));
+        points.push(new THREE.Vector2(neckR, neckStart));
+        // 5. Top Edge
+        points.push(new THREE.Vector2(neckR, H));
+        // 6. Center Top (Cap)
+        points.push(new THREE.Vector2(0, H));
+
+        const geometry = new THREE.LatheGeometry(points, QUALITY.SEGMENTS_HIGH);
+
+        // Lathe is Y-up by default, which matches our expectation if we generated profile in X-Y plane
+        // But UniversalGenerator usually rotates X -90 for Extrusion?
+        // Let's check coordinates.
+        // Points are (x=radius, y=height). So it revolves around Y axis.
+        // Result is a standing bottle.
+        // Most of UniversalGenerator primitives are "standing" on X-Z plane (Y=up).
+        // CylinderGeometry is Y-up.
+
+        // However, ExtrudeGeometry (boxes) often needs rotation because Shapes are 2D (X-Y).
+        // createRoundedBox does `geometry.rotateX(-Math.PI / 2);`
+        // But CylinderGeometry does NOT.
+
         return geometry;
     }
 }
