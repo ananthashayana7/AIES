@@ -44,6 +44,8 @@ export default function Home() {
           >
             ANALYSIS
           </button>
+          <span className="divider">|</span>
+          <a href="/2048" className="tool-btn">PLAY 2048</a>
         </div>
       </header>
 
